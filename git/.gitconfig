@@ -1,0 +1,15 @@
+[user]
+	name = NullChris
+	email = chris52475247@gmail.com
+[init]
+	defaultBranch = main
+[pull]
+	rebase = true
+[rebase]
+	autoStash = true
+[fetch]
+	prune = true
+[diff]
+	algorithm = histogram
+[core]
+	editor = nvim

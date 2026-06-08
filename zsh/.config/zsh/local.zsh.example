@@ -1,0 +1,11 @@
+# Copy this file to ~/.config/zsh/local.zsh and keep private values there.
+#
+# proxy() {
+#   export http_proxy="http://127.0.0.1:7892"
+#   export https_proxy="$http_proxy"
+#   export no_proxy="localhost,127.0.0.1,::1"
+# }
+#
+# unproxy() {
+#   unset http_proxy https_proxy no_proxy
+# }

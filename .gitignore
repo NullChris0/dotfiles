@@ -1,0 +1,8 @@
+# Host-specific overrides
+zsh/.config/zsh/local.zsh
+i3/.config/i3/local.conf
+
+# Editor and operating-system state
+*~
+*.swp
+.DS_Store

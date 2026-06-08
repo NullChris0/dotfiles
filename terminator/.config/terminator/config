@@ -1,0 +1,23 @@
+[global_config]
+  suppress_multiple_term_dialog = True
+[keybindings]
+[profiles]
+  [[default]]
+    background_color = "#2e3436"
+    show_titlebar = False
+    show_scollbar = False
+    background_darkness = 0.85
+    background_type = transparent
+    font = Ubuntu Sans Mono 18
+    foreground_color = "#ffffff"
+    use_system_font = False
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+      profile = default
+[plugins]
