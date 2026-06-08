@@ -215,3 +215,4 @@ exec_always picom -f
 
 # Host-specific outputs and other local startup commands are not tracked.
 include ~/.config/i3/local.conf
+bindsym $mod+x exec /home/$USER/.config/scripts/lock
