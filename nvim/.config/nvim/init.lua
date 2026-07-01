@@ -5,7 +5,7 @@
 -- 启用 24-bit 真彩色支持（终端需支持）
 vim.opt.termguicolors = true
 -- 设置配色方案（habamax 是 Neovim 内置配色）
-vim.cmd.colorscheme("habamax")
+vim.cmd.colorscheme("onedark")
 
 -- leader 键设置为空格，需要在所有 keymap 之前设置
 vim.g.mapleader = " "
@@ -418,6 +418,8 @@ vim.pack.add({
 	"https://github.com/nvim-tree/nvim-tree.lua",
 	-- 模糊查找
 	"https://github.com/ibhagwan/fzf-lua",
+	-- 快捷键提示
+	"https://github.com/folke/which-key.nvim",
 	-- 语法高亮与结构感知
 	{
 		src = "https://github.com/nvim-treesitter/nvim-treesitter",
@@ -442,6 +444,39 @@ vim.pack.add({
 -- =============================================================================
 -- 插件配置
 -- =============================================================================
+
+-- ----------------------------------------------------------------------------
+-- which-key.nvim（快捷键提示）
+-- ----------------------------------------------------------------------------
+local wk = require("which-key")
+wk.setup({
+	preset = "classic",
+	delay = 300,
+	win = {
+		border = "rounded",
+	},
+})
+
+wk.add({
+	{ "<leader>?", function()
+		wk.show({ global = false })
+	end, desc = "Show buffer-local keymaps" },
+	{ "<leader>b", group = "buffer" },
+	{ "<leader>c", group = "code" },
+	{ "<leader>d", group = "diagnostics" },
+	{ "<leader>e", desc = "Toggle file explorer" },
+	{ "<leader>f", group = "find" },
+	{ "<leader>g", group = "goto" },
+	{ "<leader>h", group = "git hunk" },
+	{ "<leader>o", group = "organize" },
+	{ "<leader>p", group = "path/paste" },
+	{ "<leader>q", desc = "Open diagnostic list" },
+	{ "<leader>r", group = "rename/refactor" },
+	{ "<leader>s", group = "split" },
+	{ "<leader>t", desc = "Toggle floating terminal" },
+	{ "<leader>w", group = "write/window" },
+	{ "<leader>x", desc = "Delete without yanking" },
+})
 
 -- ----------------------------------------------------------------------------
 -- nvim-tree（文件树）
@@ -572,6 +607,7 @@ local function setup_treesitter()
 		"svelte",
 		"markdown",
 		"python",
+		"java",
 		"rust",
 		"go",
 		"c",
@@ -670,67 +706,70 @@ local function lsp_on_attach(ev)
 
 	local bufnr = ev.buf
 	local opts = { noremap = true, silent = true, buffer = bufnr }
+	local function map(lhs, rhs, desc)
+		vim.keymap.set("n", lhs, rhs, vim.tbl_extend("force", opts, { desc = desc }))
+	end
 
 	-- 跳转定义（fzf-lua 版本支持多结果预览，单结果直接跳转）
-	vim.keymap.set("n", "<leader>gd", function()
+	map("<leader>gd", function()
 		require("fzf-lua").lsp_definitions({ jump_to_single_result = true })
-	end, opts)
+	end, "Go to definition")
 
 	-- 原生跳转定义（备用，不经过 fzf）
-	vim.keymap.set("n", "<leader>gD", vim.lsp.buf.definition, opts)
+	map("<leader>gD", vim.lsp.buf.definition, "Go to definition (native)")
 
 	-- 在垂直分屏中打开定义（保留当前文件不跳走）
-	vim.keymap.set("n", "<leader>gS", function()
+	map("<leader>gS", function()
 		vim.cmd("vsplit")
 		vim.lsp.buf.definition()
-	end, opts)
+	end, "Go to definition in vertical split")
 
 	-- Code action（快速修复、自动导入等）
-	vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+	map("<leader>ca", vim.lsp.buf.code_action, "Code action")
 
 	-- 重命名符号（LSP 级别，跨文件）
-	vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+	map("<leader>rn", vim.lsp.buf.rename, "Rename symbol")
 
 	-- 诊断浮窗（line: 当前行所有诊断；cursor: 光标所在诊断）
-	vim.keymap.set("n", "<leader>D", function()
+	map("<leader>D", function()
 		vim.diagnostic.open_float({ scope = "line" })
-	end, opts)
-	vim.keymap.set("n", "<leader>d", function()
+	end, "Show line diagnostics")
+	map("<leader>d", function()
 		vim.diagnostic.open_float({ scope = "cursor" })
-	end, opts)
+	end, "Show cursor diagnostics")
 
 	-- 跳转到下一个/上一个诊断
-	vim.keymap.set("n", "<leader>nd", function()
+	map("<leader>nd", function()
 		vim.diagnostic.jump({ count = 1 })
-	end, opts)
-	vim.keymap.set("n", "<leader>pd", function()
+	end, "Next diagnostic")
+	map("<leader>pd", function()
 		vim.diagnostic.jump({ count = -1 })
-	end, opts)
+	end, "Previous diagnostic")
 
 	-- hover 文档（再次按 K 可以进入浮窗）
-	vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+	map("K", vim.lsp.buf.hover, "Hover documentation")
 
 	-- fzf-lua LSP 查找系列
-	vim.keymap.set("n", "<leader>fr", function()
+	map("<leader>fr", function()
 		require("fzf-lua").lsp_references()
-	end, opts)
-	vim.keymap.set("n", "<leader>ft", function()
+	end, "Find references")
+	map("<leader>ft", function()
 		require("fzf-lua").lsp_typedefs()
-	end, opts)
-	vim.keymap.set("n", "<leader>fs", function()
+	end, "Find type definitions")
+	map("<leader>fs", function()
 		require("fzf-lua").lsp_document_symbols()
-	end, opts)
-	vim.keymap.set("n", "<leader>fw", function()
+	end, "Find document symbols")
+	map("<leader>fw", function()
 		require("fzf-lua").lsp_workspace_symbols()
-	end, opts)
-	vim.keymap.set("n", "<leader>fi", function()
+	end, "Find workspace symbols")
+	map("<leader>fi", function()
 		require("fzf-lua").lsp_implementations()
-	end, opts)
+	end, "Find implementations")
 
 	-- 整理导入（如 Go 的 goimports、TS 的 organize imports）
 	-- 仅在 LSP 支持 codeAction 时注册
 	if client:supports_method("textDocument/codeAction", bufnr) then
-		vim.keymap.set("n", "<leader>oi", function()
+		map("<leader>oi", function()
 			vim.lsp.buf.code_action({
 				context = { only = { "source.organizeImports" }, diagnostics = {} },
 				apply = true,
@@ -740,7 +779,7 @@ local function lsp_on_attach(ev)
 			vim.defer_fn(function()
 				vim.lsp.buf.format({ bufnr = bufnr })
 			end, 50)
-		end, opts)
+		end, "Organize imports")
 	end
 end
 
@@ -814,6 +853,11 @@ vim.lsp.config("bashls", {}) -- Bash/Shell
 vim.lsp.config("ts_ls", {}) -- TypeScript/JavaScript
 vim.lsp.config("gopls", {}) -- Go
 vim.lsp.config("clangd", {}) -- C/C++
+vim.lsp.config("jdtls", {
+	cmd_env = {
+		JAVA_HOME = vim.fn.expand("~/.local/share/mise/installs/java/temurin-21.0.11+10.0.LTS"),
+	},
+}) -- Java
 
 -- ----------------------------------------------------------------------------
 -- efm-langserver（统一的 linting 和 formatting 服务）
@@ -893,6 +937,7 @@ vim.lsp.enable({
 	"ts_ls",
 	"gopls",
 	"clangd",
+	"jdtls",
 	"efm",
 })
 
