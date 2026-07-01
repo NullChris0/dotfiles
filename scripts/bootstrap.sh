@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-packages=(zsh git i3 terminator mise assets)
+packages=(zsh git i3 terminator mise assets nvim)
 required_commands=(git stow zsh)
 optional_commands=(i3 i3status rofi dex xss-lock i3lock nm-applet blueman-applet dunst pactl xrandr feh picom flameshot terminator direnv mise fzf rg)
 

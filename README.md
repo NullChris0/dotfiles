@@ -12,6 +12,7 @@ Personal Linux configuration managed with Git and GNU Stow.
 | terminator | Terminator profile and layout |
 | mise | Tool versions |
 | assets | Desktop image assets |
+| nvim | Neovim configuration and vim.pack lock file |
 
 Machine-specific proxy endpoints and display commands belong in:
 
@@ -27,6 +28,7 @@ Required for installation:
 - Git
 - GNU Stow
 - Zsh
+- Neovim 0.12.x
 Validation additionally uses i3 and ripgrep.
 
 The shell configuration also expects Oh My Zsh, Powerlevel10k, zsh-autosuggestions, zsh-syntax-highlighting, direnv, mise, and fzf. The i3 configuration references i3status, rofi, dex, xss-lock, i3lock, NetworkManager's applet, Blueman, dunst, PulseAudio tools, xrandr, feh, picom, and Flameshot. Install these with the operating system's package manager.
@@ -73,7 +75,7 @@ git push
 ~~~bash
 cd "$HOME/dotfiles"
 stow --dir="$PWD" --target="$HOME" --no-folding --delete \
-  zsh git i3 terminator mise assets
+  zsh git i3 terminator mise assets nvim
 ~~~
 
 Local override files are regular untracked files and remain after unstowing.

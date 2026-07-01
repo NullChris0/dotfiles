@@ -1,0 +1,998 @@
+-- =============================================================================
+-- 外观
+-- =============================================================================
+
+-- 启用 24-bit 真彩色支持（终端需支持）
+vim.opt.termguicolors = true
+-- 设置配色方案（habamax 是 Neovim 内置配色）
+vim.cmd.colorscheme("habamax")
+
+-- leader 键设置为空格，需要在所有 keymap 之前设置
+vim.g.mapleader = " "
+vim.g.maplocalleader = " "
+
+-- =============================================================================
+-- 选项
+-- =============================================================================
+
+-- 行号
+vim.opt.number = true -- 显示绝对行号
+vim.opt.relativenumber = true -- 显示相对行号（配合 number 显示当前行绝对行号）
+vim.opt.cursorline = true -- 高亮当前行
+
+-- 滚动
+vim.opt.scrolloff = 10 -- 光标上下保留至少 10 行可视区域
+vim.opt.sidescrolloff = 10 -- 光标左右保留至少 10 列可视区域
+vim.opt.wrap = false -- 不自动折行（长行向右延伸）
+
+-- 缩进（使用 4 空格）
+vim.opt.expandtab = true -- Tab 键插入空格而非 \t
+vim.opt.shiftwidth = 4 -- 自动缩进宽度（>>、<<、智能缩进）
+vim.opt.tabstop = 4 -- \t 字符显示宽度
+vim.opt.softtabstop = 4 -- Tab/Backspace 操作的空格数，与 tabstop 一致避免混乱
+vim.opt.smartindent = true -- 插入新行时根据语法自动缩进
+vim.opt.autoindent = true -- 新行继承上一行的缩进
+
+-- 搜索
+vim.opt.ignorecase = true -- 搜索忽略大小写
+vim.opt.smartcase = true -- 搜索词含大写字母时自动区分大小写
+vim.opt.hlsearch = true -- 高亮所有匹配项
+vim.opt.incsearch = true -- 输入时即时显示匹配（Neovim 默认开启，显式声明更清晰）
+
+-- 视觉辅助
+vim.opt.signcolumn = "yes" -- 始终显示 sign 列（避免 LSP/git 图标出现时布局跳动）
+vim.opt.colorcolumn = "100" -- 在第 100 列显示参考线
+vim.opt.showmatch = true -- 输入括号时短暂跳转到匹配括号
+vim.opt.showmode = false -- 不在命令行显示模式（statusline 已有模式显示）
+vim.opt.pumheight = 10 -- 补全弹出菜单最多显示 10 项
+vim.opt.fillchars = { eob = " " } -- 用空格替代缓冲区末尾的 "~" 符号
+
+-- 分屏
+vim.opt.splitbelow = true -- 水平分屏新窗口在下方
+vim.opt.splitright = true -- 垂直分屏新窗口在右侧
+
+-- 剪贴板与鼠标
+vim.opt.clipboard = "unnamedplus" -- 使用系统剪贴板（需要 xclip/xsel/wl-clipboard）
+vim.opt.mouse = "a" -- 所有模式下启用鼠标支持
+
+-- 持久化撤销（重启 Neovim 后仍可撤销）
+vim.opt.undofile = false
+vim.opt.swapfile = false -- 不创建交换文件
+vim.opt.backup = false -- 不创建备份文件
+vim.opt.writebackup = false -- 写入时不创建临时备份
+
+-- 性能
+vim.opt.updatetime = 300 -- 触发 CursorHold 事件的等待时间（影响 LSP 诊断延迟）
+vim.opt.timeoutlen = 500 -- 等待按键序列完成的时间（ms），影响 which-key 类插件
+
+-- 折叠（交给 treesitter 的 autocmd 按 FileType 激活，全局先关闭）
+vim.opt.foldlevel = 99 -- 默认展开所有折叠
+
+-- 其他
+vim.opt.hidden = true -- 允许切换缓冲区时保留未保存的修改
+vim.opt.backspace = "indent,eol,start" -- 允许 Backspace 跨越缩进、行尾、插入点
+vim.opt.iskeyword:append("-") -- 将 - 视为单词字符（如 CSS 类名 flex-col 视为整体）
+vim.opt.cmdheight = 1 -- 命令行高度
+
+-- 禁用 netrw（使用 nvim-tree 替代，需在 nvim-tree 加载前设置）
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
+-- =============================================================================
+-- STATUSLINE
+-- =============================================================================
+
+-- Git 分支名缓存（避免每次渲染 statusline 都调用 shell 命令）
+local cached_branch = ""
+local last_check = 0
+local function git_branch()
+	local now = vim.uv.now()
+	-- 每 5 秒刷新一次，平衡实时性与性能
+	if now - last_check > 5000 then
+		cached_branch = vim.fn.system("git branch --show-current 2>/dev/null | tr -d '\n'")
+		last_check = now
+	end
+	if cached_branch ~= "" then
+		return " \u{e725} " .. cached_branch .. " " -- nf-dev-git_branch 图标
+	end
+	return ""
+end
+
+-- 文件类型显示（带 Nerd Font 图标）
+local function file_type()
+	local ft = vim.bo.filetype
+	local icons = {
+		lua = "\u{e620} ", -- nf-dev-lua
+		python = "\u{e73c} ", -- nf-dev-python
+		javascript = "\u{e74e} ", -- nf-dev-javascript
+		typescript = "\u{e628} ", -- nf-dev-typescript
+		javascriptreact = "\u{e7ba} ",
+		typescriptreact = "\u{e7ba} ",
+		html = "\u{e736} ", -- nf-dev-html5
+		css = "\u{e749} ", -- nf-dev-css3
+		scss = "\u{e749} ",
+		json = "\u{e60b} ", -- nf-dev-json
+		markdown = "\u{e73e} ", -- nf-dev-markdown
+		vim = "\u{e62b} ", -- nf-dev-vim
+		sh = "\u{f489} ", -- nf-oct-terminal
+		bash = "\u{f489} ",
+		zsh = "\u{f489} ",
+		rust = "\u{e7a8} ", -- nf-dev-rust
+		go = "\u{e724} ", -- nf-dev-go
+		c = "\u{e61e} ", -- nf-dev-c
+		cpp = "\u{e61d} ", -- nf-dev-cplusplus
+		java = "\u{e738} ", -- nf-dev-java
+		php = "\u{e73d} ", -- nf-dev-php
+		ruby = "\u{e739} ", -- nf-dev-ruby
+		swift = "\u{e755} ", -- nf-dev-swift
+		kotlin = "\u{e634} ",
+		dart = "\u{e798} ",
+		elixir = "\u{e62d} ",
+		haskell = "\u{e777} ",
+		sql = "\u{e706} ",
+		yaml = "\u{f481} ",
+		toml = "\u{e615} ",
+		xml = "\u{f05c} ",
+		dockerfile = "\u{f308} ", -- nf-linux-docker
+		gitcommit = "\u{f418} ", -- nf-oct-git_commit
+		gitconfig = "\u{f1d3} ", -- nf-fa-git
+		vue = "\u{fd42} ", -- nf-md-vuejs
+		svelte = "\u{e697} ",
+		astro = "\u{e628} ",
+	}
+	if ft == "" then
+		return " \u{f15b} " -- nf-fa-file_o（无文件类型时的占位图标）
+	end
+	return (icons[ft] or " \u{f15b} ") .. ft
+end
+
+-- 文件大小显示
+local function file_size()
+	local size = vim.fn.getfsize(vim.fn.expand("%"))
+	if size < 0 then
+		return "" -- 文件不存在或无法获取大小
+	end
+	local size_str
+	if size < 1024 then
+		size_str = size .. "B"
+	elseif size < 1024 * 1024 then
+		size_str = string.format("%.1fK", size / 1024)
+	else
+		size_str = string.format("%.1fM", size / 1024 / 1024)
+	end
+	return " \u{f016} " .. size_str .. " " -- nf-fa-file_o
+end
+
+-- 当前模式显示（带 Nerd Font 图标）
+local function mode_icon()
+	local mode = vim.fn.mode()
+	local modes = {
+		n = " \u{f121}  NORMAL", -- nf-fa-code
+		i = " \u{f11c}  INSERT", -- nf-fa-keyboard_o
+		v = " \u{f0168} VISUAL", -- nf-md-select_all
+		V = " \u{f0168} V-LINE",
+		["\22"] = " \u{f0168} V-BLOCK", -- Ctrl-V 的原始字节
+		c = " \u{f120} COMMAND", -- nf-fa-terminal
+		s = " \u{f0c5} SELECT",
+		S = " \u{f0c5} S-LINE",
+		["\19"] = " \u{f0c5} S-BLOCK", -- Ctrl-S 的原始字节
+		R = " \u{f044} REPLACE",
+		r = " \u{f044} REPLACE",
+		["!"] = " \u{f489} SHELL",
+		t = " \u{f120} TERMINAL",
+	}
+	return modes[mode] or (" \u{f059} " .. mode)
+end
+
+-- 暴露到全局供 statusline 的 vimscript 表达式调用
+-- statusline 字符串中 %{v:lua.xxx()} 只能访问全局函数
+_G.mode_icon = mode_icon
+_G.git_branch = git_branch
+_G.file_type = file_type
+_G.file_size = file_size
+
+-- 定义加粗高亮组，用于 statusline 中的模式区域
+vim.api.nvim_set_hl(0, "StatusLineBold", { bold = true })
+
+-- 根据窗口焦点切换 statusline 样式
+local function setup_dynamic_statusline()
+	-- 当前窗口：显示完整信息
+	vim.api.nvim_create_autocmd({ "WinEnter", "BufEnter" }, {
+		callback = function()
+			vim.opt_local.statusline = table.concat({
+				"  ",
+				"%#StatusLineBold#",
+				"%{v:lua.mode_icon()}", -- 当前模式
+				"%#StatusLine#",
+				" \u{e0b1} %f %h%m%r", -- 文件名 + 修改/只读标志，nf-pl-left_soft_divider
+				"%{v:lua.git_branch()}", -- git 分支
+				"\u{e0b1} ",
+				"%{v:lua.file_type()}", -- 文件类型 + 图标
+				"\u{e0b1} ",
+				"%{v:lua.file_size()}", -- 文件大小
+				"%=", -- 右对齐分隔符
+				" \u{f017} %l:%c  %P ", -- 行:列 + 百分比位置，nf-fa-clock_o
+			})
+		end,
+	})
+	-- 非焦点窗口：精简显示
+	vim.api.nvim_create_autocmd({ "WinLeave", "BufLeave" }, {
+		callback = function()
+			vim.opt_local.statusline = "  %f %h%m%r \u{e0b1} %{v:lua.file_type()} %=  %l:%c   %P "
+		end,
+	})
+end
+
+setup_dynamic_statusline()
+
+-- =============================================================================
+-- 快捷键
+-- =============================================================================
+
+-- 保存与退出
+vim.keymap.set("n", "<leader>w", "<cmd>write<cr>", { desc = "Save file" })
+vim.keymap.set("n", "<leader>wq", "<cmd>quit<cr>", { desc = "Close window" })
+
+-- 清除搜索高亮
+vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
+
+-- 搜索结果居中显示（避免结果出现在屏幕边缘）
+vim.keymap.set("n", "n", "nzzzv", { desc = "Next search result (centered)" })
+vim.keymap.set("n", "N", "Nzzzv", { desc = "Previous search result (centered)" })
+
+-- 半页滚动居中（与搜索居中保持一致的体验）
+vim.keymap.set("n", "<C-d>", "<C-d>zz", { desc = "Half page down (centered)" })
+vim.keymap.set("n", "<C-u>", "<C-u>zz", { desc = "Half page up (centered)" })
+
+-- j/k 在有折行时按视觉行移动，有计数时按实际行移动（支持 5j 之类的操作）
+vim.keymap.set("n", "j", function()
+	return vim.v.count == 0 and "gj" or "j"
+end, { expr = true, silent = true, desc = "Down (wrap-aware)" })
+vim.keymap.set("n", "k", function()
+	return vim.v.count == 0 and "gk" or "k"
+end, { expr = true, silent = true, desc = "Up (wrap-aware)" })
+
+-- 粘贴不覆盖寄存器（先删除到黑洞寄存器，再粘贴）
+vim.keymap.set("x", "<leader>p", '"_dP', { desc = "Paste without yanking" })
+-- 删除不覆盖寄存器
+vim.keymap.set({ "n", "v" }, "<leader>x", '"_d', { desc = "Delete without yanking" })
+
+-- 合并行保持光标位置（原生 J 会将光标移到合并点）
+vim.keymap.set("n", "J", "mzJ`z", { desc = "Join lines and keep cursor position" })
+
+-- 缩进后保持选区（原生 < > 会退出 visual 模式）
+vim.keymap.set("v", "<", "<gv", { desc = "Indent left and reselect" })
+vim.keymap.set("v", ">", ">gv", { desc = "Indent right and reselect" })
+
+-- 移动行/选区（Alt+j/k）
+vim.keymap.set("n", "<A-j>", ":m .+1<CR>==", { desc = "Move line down" })
+vim.keymap.set("n", "<A-k>", ":m .-2<CR>==", { desc = "Move line up" })
+vim.keymap.set("v", "<A-j>", ":m '>+1<CR>gv=gv", { desc = "Move selection down" })
+vim.keymap.set("v", "<A-k>", ":m '<-2<CR>gv=gv", { desc = "Move selection up" })
+
+-- 缓冲区切换
+vim.keymap.set("n", "<leader>bn", ":bnext<CR>", { desc = "Next buffer" })
+vim.keymap.set("n", "<leader>bp", ":bprevious<CR>", { desc = "Previous buffer" })
+
+-- 窗口分屏
+vim.keymap.set("n", "<leader>sv", ":vsplit<CR>", { desc = "Split window vertically" })
+vim.keymap.set("n", "<leader>sh", ":split<CR>", { desc = "Split window horizontally" })
+
+-- 调整窗口大小
+vim.keymap.set("n", "<C-Up>", ":resize +2<CR>", { desc = "Increase window height" })
+vim.keymap.set("n", "<C-Down>", ":resize -2<CR>", { desc = "Decrease window height" })
+vim.keymap.set("n", "<C-Left>", ":vertical resize -2<CR>", { desc = "Decrease window width" })
+vim.keymap.set("n", "<C-Right>", ":vertical resize +2<CR>", { desc = "Increase window width" })
+
+-- 复制当前文件完整路径到系统剪贴板
+vim.keymap.set("n", "<leader>pa", function()
+	local path = vim.fn.expand("%:p")
+	vim.fn.setreg("+", path)
+	print("file:", path)
+end, { desc = "Copy full file path" })
+
+-- 切换诊断显示（临时关闭可减少视觉干扰）
+-- vim.keymap.set("n", "<leader>td", function()
+--  	vim.diagnostic.enable(not vim.diagnostic.is_enabled())
+-- end, { desc = "Toggle diagnostics" })
+
+-- =============================================================================
+-- AUTOCMDS
+-- =============================================================================
+
+-- 所有用户 autocmd 放在同一个 augroup 中，便于管理和避免重复注册
+local augroup = vim.api.nvim_create_augroup("UserConfig", { clear = true })
+
+-- 保存时自动格式化（仅在 efm-langserver 已附加时执行）
+vim.api.nvim_create_autocmd("BufWritePre", {
+	group = augroup,
+	pattern = {
+		"*.lua",
+		"*.py",
+		"*.go",
+		"*.js",
+		"*.jsx",
+		"*.ts",
+		"*.tsx",
+		"*.json",
+		"*.css",
+		"*.scss",
+		"*.html",
+		"*.sh",
+		"*.bash",
+		"*.zsh",
+		"*.c",
+		"*.cpp",
+		"*.h",
+		"*.hpp",
+	},
+	callback = function(args)
+		-- 跳过特殊缓冲区（如 quickfix、terminal、prompt 等）
+		if vim.bo[args.buf].buftype ~= "" then
+			return
+		end
+		-- 跳过不可修改缓冲区
+		if not vim.bo[args.buf].modifiable then
+			return
+		end
+		-- 跳过未命名缓冲区
+		if vim.api.nvim_buf_get_name(args.buf) == "" then
+			return
+		end
+
+		-- 检查 efm 是否已附加到当前缓冲区
+		local has_efm = false
+		for _, c in ipairs(vim.lsp.get_clients({ bufnr = args.buf })) do
+			if c.name == "efm" then
+				has_efm = true
+				break
+			end
+		end
+		if not has_efm then
+			return
+		end
+
+		-- 只使用 efm 格式化，避免其他 LSP（如 ts_ls）抢占格式化权
+		pcall(vim.lsp.buf.format, {
+			bufnr = args.buf,
+			timeout_ms = 2000,
+			filter = function(c)
+				return c.name == "efm"
+			end,
+		})
+	end,
+})
+
+-- 复制后短暂高亮被复制的区域
+vim.api.nvim_create_autocmd("TextYankPost", {
+	group = augroup,
+	callback = function()
+		vim.hl.on_yank()
+	end,
+})
+
+-- 重新打开文件时恢复上次光标位置
+vim.api.nvim_create_autocmd("BufReadPost", {
+	group = augroup,
+	desc = "Restore last cursor position",
+	callback = function()
+		-- diff 模式下不恢复（会干扰对比视图）
+		if vim.o.diff then
+			return
+		end
+
+		local last_pos = vim.api.nvim_buf_get_mark(0, '"') -- 返回 {line, col}
+		local last_line = vim.api.nvim_buf_line_count(0)
+		local row = last_pos[1]
+
+		-- 行号有效才恢复（防止标记在文件被截断后越界）
+		if row < 1 or row > last_line then
+			return
+		end
+
+		pcall(vim.api.nvim_win_set_cursor, 0, last_pos)
+	end,
+})
+
+-- Markdown/文本/Git commit 开启折行、整词折行和拼写检查
+vim.api.nvim_create_autocmd("FileType", {
+	group = augroup,
+	pattern = { "markdown", "text", "gitcommit" },
+	callback = function()
+		vim.opt_local.wrap = true -- 开启折行
+		vim.opt_local.linebreak = true -- 在单词边界折行，而非字符中间
+		vim.opt_local.spell = true -- 开启拼写检查
+	end,
+})
+
+-- =============================================================================
+-- 插件安装 (vim.pack — Neovim 0.12 内置包管理器)
+-- =============================================================================
+
+vim.pack.add({
+	-- 工具集合（mini.ai/comment/surround 等，按需 setup）
+	"https://github.com/echasnovski/mini.nvim",
+	-- Git 集成（signs、blame、hunk 操作）
+	"https://github.com/lewis6991/gitsigns.nvim",
+	-- 文件树
+	"https://github.com/nvim-tree/nvim-tree.lua",
+	-- 模糊查找
+	"https://github.com/ibhagwan/fzf-lua",
+	-- 语法高亮与结构感知
+	{
+		src = "https://github.com/nvim-treesitter/nvim-treesitter",
+		branch = "main",
+		build = ":TSUpdate", -- 安装/更新后自动编译 parser
+	},
+	-- LSP 配置
+	"https://github.com/neovim/nvim-lspconfig",
+	-- LSP/格式化工具安装管理器
+	"https://github.com/mason-org/mason.nvim",
+	-- efm-langserver 的预置 linter/formatter 配置
+	"https://github.com/creativenull/efmls-configs-nvim",
+	-- 补全引擎（需要 Rust toolchain 构建，或使用预编译二进制）
+	{
+		src = "https://github.com/saghen/blink.cmp",
+		version = vim.version.range("1.*"),
+	},
+	-- snippet 引擎（blink.cmp 的 snippets 扩展依赖）
+	"https://github.com/L3MON4D3/LuaSnip",
+})
+
+-- =============================================================================
+-- 插件配置
+-- =============================================================================
+
+-- ----------------------------------------------------------------------------
+-- nvim-tree（文件树）
+-- ----------------------------------------------------------------------------
+require("nvim-tree").setup({
+	view = { width = 35 },
+	filters = { dotfiles = false }, -- 显示隐藏文件（.env、.gitignore 等）
+	renderer = { group_empty = true }, -- 将连续的空目录合并显示（如 src/components/）
+})
+
+vim.keymap.set("n", "<leader>e", function()
+	require("nvim-tree.api").tree.toggle()
+end, { desc = "Toggle NvimTree" })
+
+-- nvim-tree 透明背景
+vim.api.nvim_set_hl(0, "NvimTreeNormal", { bg = "none" })
+vim.api.nvim_set_hl(0, "NvimTreeNormalNC", { bg = "none" })
+vim.api.nvim_set_hl(0, "NvimTreeSignColumn", { bg = "none" })
+vim.api.nvim_set_hl(0, "NvimTreeEndOfBuffer", { bg = "none" })
+vim.api.nvim_set_hl(0, "NvimTreeWinSeparator", { fg = "#2a2a2a", bg = "none" })
+
+-- ----------------------------------------------------------------------------
+-- fzf-lua（模糊查找）
+-- ----------------------------------------------------------------------------
+require("fzf-lua").setup({})
+
+vim.keymap.set("n", "<leader>ff", function()
+	require("fzf-lua").files()
+end, { desc = "FZF Files" })
+vim.keymap.set("n", "<leader>fg", function()
+	require("fzf-lua").live_grep()
+end, { desc = "FZF Live Grep" })
+vim.keymap.set("n", "<leader>fb", function()
+	require("fzf-lua").buffers()
+end, { desc = "FZF Buffers" })
+vim.keymap.set("n", "<leader>fh", function()
+	require("fzf-lua").help_tags()
+end, { desc = "FZF Help Tags" })
+vim.keymap.set("n", "<leader>fx", function()
+	require("fzf-lua").diagnostics_document()
+end, { desc = "FZF Diagnostics (buffer)" })
+vim.keymap.set("n", "<leader>fX", function()
+	require("fzf-lua").diagnostics_workspace()
+end, { desc = "FZF Diagnostics (workspace)" })
+
+-- ----------------------------------------------------------------------------
+-- mini.nvim（各组件独立 setup，只启用实际需要的）
+-- ----------------------------------------------------------------------------
+require("mini.ai").setup({}) -- 增强文本对象（va(、di" 等）
+require("mini.comment").setup({}) -- gcc 注释当前行，gc + motion 注释区域
+require("mini.move").setup({}) -- Alt+hjkl 移动行/选区（与下方 A-j/k keymap 功能重叠，保留 mini.move 支持左右移动）
+require("mini.surround").setup({}) -- sa/sd/sr 添加/删除/替换包裹符号
+require("mini.cursorword").setup({}) -- 自动高亮光标所在单词的所有出现
+require("mini.indentscope").setup({}) -- 动态缩进参考线（当前代码块）
+require("mini.pairs").setup({}) -- 括号/引号自动补全另一半
+require("mini.trailspace").setup({}) -- 高亮行尾多余空格
+require("mini.bufremove").setup({}) -- 关闭缓冲区而不关闭窗口（:bd 替代）
+require("mini.notify").setup({}) -- 浮窗通知替代 vim.notify
+require("mini.icons").setup({}) -- 图标支持（供 fzf-lua、nvim-tree 等使用）
+
+-- ----------------------------------------------------------------------------
+-- gitsigns.nvim（Git 集成）
+-- ----------------------------------------------------------------------------
+require("gitsigns").setup({
+	signs = {
+		add = { text = "\u{2590}" }, -- ▐
+		change = { text = "\u{2590}" },
+		delete = { text = "\u{2590}" },
+		topdelete = { text = "\u{25e6}" }, -- ◦
+		changedelete = { text = "\u{25cf}" }, -- ●
+		untracked = { text = "\u{25cb}" }, -- ○
+	},
+	signcolumn = true,
+	current_line_blame = false, -- 行内 blame 默认关闭，<leader>hB 手动切换
+
+	on_attach = function(bufnr)
+		local gs = require("gitsigns")
+
+		local function map(mode, lhs, rhs, desc)
+			vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
+		end
+
+		-- hunk 导航
+		map("n", "]h", function()
+			gs.nav_hunk("next")
+		end, "Next git hunk")
+		map("n", "[h", function()
+			gs.nav_hunk("prev")
+		end, "Previous git hunk")
+
+		-- hunk 操作
+		map("n", "<leader>hs", gs.stage_hunk, "Stage hunk")
+		map("n", "<leader>hr", gs.reset_hunk, "Reset hunk")
+		map("n", "<leader>hp", gs.preview_hunk, "Preview hunk")
+
+		-- blame
+		map("n", "<leader>hb", function()
+			gs.blame_line({ full = true })
+		end, "Blame line")
+		map("n", "<leader>hB", gs.toggle_current_line_blame, "Toggle inline blame")
+
+		-- diff
+		map("n", "<leader>hd", gs.diffthis, "Diff this")
+	end,
+})
+
+-- ----------------------------------------------------------------------------
+-- nvim-treesitter（语法高亮与结构感知）
+-- ----------------------------------------------------------------------------
+local function setup_treesitter()
+	local treesitter = require("nvim-treesitter")
+	local config = require("nvim-treesitter.config")
+
+	treesitter.setup({})
+
+	-- 需要安装的 parser 列表
+	local ensure_installed = {
+		"vim",
+		"vimdoc",
+		"lua",
+		"bash",
+		"json",
+		"html",
+		"css",
+		"javascript",
+		"typescript",
+		"vue",
+		"svelte",
+		"markdown",
+		"python",
+		"rust",
+		"go",
+		"c",
+		"cpp",
+	}
+
+	-- 只安装尚未安装的 parser，避免重复触发编译
+	local already_installed = config.get_installed()
+	local parsers_to_install = {}
+
+	for _, parser in ipairs(ensure_installed) do
+		if not vim.tbl_contains(already_installed, parser) then
+			table.insert(parsers_to_install, parser)
+		end
+	end
+
+	if #parsers_to_install > 0 then
+		treesitter.install(parsers_to_install)
+	end
+
+	-- 按 FileType 激活 treesitter 高亮和折叠
+	-- 不在全局设置 foldmethod=expr，因为没有 parser 的文件类型会报错
+	local group = vim.api.nvim_create_augroup("TreeSitterConfig", { clear = true })
+	vim.api.nvim_create_autocmd("FileType", {
+		group = group,
+		callback = function(args)
+			local lang = vim.treesitter.language.get_lang(args.match)
+
+			-- 仅在该语言的 parser 已安装时才启用，避免报错
+			if lang and vim.list_contains(config.get_installed(), lang) then
+				vim.treesitter.start(args.buf, lang)
+
+				-- 折叠交给 treesitter 表达式，foldlevel=99 保持默认全部展开
+				vim.wo.foldmethod = "expr"
+				vim.wo.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+				vim.wo.foldlevel = 99
+			end
+		end,
+	})
+end
+
+setup_treesitter()
+
+-- ----------------------------------------------------------------------------
+-- mason.nvim（LSP/linter/formatter 安装管理器）
+-- ----------------------------------------------------------------------------
+-- mason 只负责安装二进制工具，不自动配置 LSP
+-- 安装好的工具路径会自动加入 PATH，供 lspconfig 和 efm 使用
+require("mason").setup({})
+
+-- =============================================================================
+-- LSP、Linting、Formatting、补全
+-- =============================================================================
+
+-- 诊断图标与显示样式
+vim.diagnostic.config({
+	virtual_text = { prefix = "●", spacing = 4 },
+	signs = {
+		text = {
+			[vim.diagnostic.severity.ERROR] = "\u{f057} ", -- nf-fa-times_circle
+			[vim.diagnostic.severity.WARN] = "\u{f071} ", -- nf-fa-exclamation_triangle
+			[vim.diagnostic.severity.INFO] = "\u{f05a}", -- nf-fa-info_circle
+			[vim.diagnostic.severity.HINT] = "\u{ea61}", -- nf-cod-lightbulb
+		},
+	},
+	underline = true,
+	update_in_insert = false, -- 插入模式下不更新诊断（减少干扰）
+	severity_sort = true, -- 按严重程度排序（Error 在最前）
+	float = {
+		border = "rounded",
+		source = true, -- 显示诊断来源（如 "eslint"、"pyright"）
+		header = "",
+		prefix = "",
+		focusable = false,
+		style = "minimal",
+	},
+})
+
+-- 为所有 LSP 浮窗（hover、signature help 等）统一添加圆角边框
+-- 通过覆写 open_floating_preview 实现，比逐一配置每个 LSP 更简洁
+do
+	local orig = vim.lsp.util.open_floating_preview
+	function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+		opts = opts or {}
+		opts.border = opts.border or "rounded"
+		return orig(contents, syntax, opts, ...)
+	end
+end
+
+-- LSP 附加回调：每当 LSP 连接到缓冲区时执行，绑定 LSP 相关快捷键
+local function lsp_on_attach(ev)
+	local client = vim.lsp.get_client_by_id(ev.data.client_id)
+	if not client then
+		return
+	end
+
+	local bufnr = ev.buf
+	local opts = { noremap = true, silent = true, buffer = bufnr }
+
+	-- 跳转定义（fzf-lua 版本支持多结果预览，单结果直接跳转）
+	vim.keymap.set("n", "<leader>gd", function()
+		require("fzf-lua").lsp_definitions({ jump_to_single_result = true })
+	end, opts)
+
+	-- 原生跳转定义（备用，不经过 fzf）
+	vim.keymap.set("n", "<leader>gD", vim.lsp.buf.definition, opts)
+
+	-- 在垂直分屏中打开定义（保留当前文件不跳走）
+	vim.keymap.set("n", "<leader>gS", function()
+		vim.cmd("vsplit")
+		vim.lsp.buf.definition()
+	end, opts)
+
+	-- Code action（快速修复、自动导入等）
+	vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+
+	-- 重命名符号（LSP 级别，跨文件）
+	vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+
+	-- 诊断浮窗（line: 当前行所有诊断；cursor: 光标所在诊断）
+	vim.keymap.set("n", "<leader>D", function()
+		vim.diagnostic.open_float({ scope = "line" })
+	end, opts)
+	vim.keymap.set("n", "<leader>d", function()
+		vim.diagnostic.open_float({ scope = "cursor" })
+	end, opts)
+
+	-- 跳转到下一个/上一个诊断
+	vim.keymap.set("n", "<leader>nd", function()
+		vim.diagnostic.jump({ count = 1 })
+	end, opts)
+	vim.keymap.set("n", "<leader>pd", function()
+		vim.diagnostic.jump({ count = -1 })
+	end, opts)
+
+	-- hover 文档（再次按 K 可以进入浮窗）
+	vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+
+	-- fzf-lua LSP 查找系列
+	vim.keymap.set("n", "<leader>fr", function()
+		require("fzf-lua").lsp_references()
+	end, opts)
+	vim.keymap.set("n", "<leader>ft", function()
+		require("fzf-lua").lsp_typedefs()
+	end, opts)
+	vim.keymap.set("n", "<leader>fs", function()
+		require("fzf-lua").lsp_document_symbols()
+	end, opts)
+	vim.keymap.set("n", "<leader>fw", function()
+		require("fzf-lua").lsp_workspace_symbols()
+	end, opts)
+	vim.keymap.set("n", "<leader>fi", function()
+		require("fzf-lua").lsp_implementations()
+	end, opts)
+
+	-- 整理导入（如 Go 的 goimports、TS 的 organize imports）
+	-- 仅在 LSP 支持 codeAction 时注册
+	if client:supports_method("textDocument/codeAction", bufnr) then
+		vim.keymap.set("n", "<leader>oi", function()
+			vim.lsp.buf.code_action({
+				context = { only = { "source.organizeImports" }, diagnostics = {} },
+				apply = true,
+				bufnr = bufnr,
+			})
+			-- 整理导入后延迟执行格式化，确保导入顺序稳定后再格式化
+			vim.defer_fn(function()
+				vim.lsp.buf.format({ bufnr = bufnr })
+			end, 50)
+		end, opts)
+	end
+end
+
+-- 注册 LspAttach autocmd（所有 LSP 共用同一套回调）
+vim.api.nvim_create_autocmd("LspAttach", { group = augroup, callback = lsp_on_attach })
+
+-- 诊断列表快捷键（在 loclist 中查看当前缓冲区所有诊断）
+vim.keymap.set("n", "<leader>q", function()
+	vim.diagnostic.setloclist({ open = true })
+end, { desc = "Open diagnostic list" })
+vim.keymap.set("n", "<leader>dl", vim.diagnostic.open_float, { desc = "Show line diagnostics" })
+
+-- ----------------------------------------------------------------------------
+-- blink.cmp（补全引擎）
+-- ----------------------------------------------------------------------------
+require("blink.cmp").setup({
+	keymap = {
+		preset = "none", -- 不使用任何预设，完全自定义
+		["<C-Space>"] = { "show", "hide" }, -- 手动触发/关闭补全菜单
+		["<CR>"] = { "accept", "fallback" }, -- 确认选中项
+		["<C-j>"] = { "select_next", "fallback" },
+		["<C-k>"] = { "select_prev", "fallback" },
+		["<Tab>"] = { "snippet_forward", "fallback" }, -- snippet 内跳到下一个占位符
+		["<S-Tab>"] = { "snippet_backward", "fallback" }, -- snippet 内跳到上一个占位符
+	},
+	appearance = { nerd_font_variant = "mono" }, -- 使用等宽 Nerd Font 图标
+	completion = {
+		menu = {
+			-- markdown 文件不自动弹出补全（写作时干扰较大）
+			auto_show = function()
+				return vim.bo.filetype ~= "markdown"
+			end,
+		},
+	},
+	sources = { default = { "lsp", "path", "buffer", "snippets" } },
+	snippets = {
+		-- 使用 LuaSnip 展开 snippet（blink.cmp 传入 snippet body，LuaSnip 负责渲染占位符）
+		expand = function(snippet)
+			require("luasnip").lsp_expand(snippet)
+		end,
+	},
+	fuzzy = {
+		implementation = "prefer_rust", -- 优先使用 Rust 实现的模糊匹配（更快）
+		prebuilt_binaries = { download = true }, -- 自动下载预编译二进制
+	},
+})
+
+-- ----------------------------------------------------------------------------
+-- LSP 服务器配置（Neovim 0.12 新 API：vim.lsp.config + vim.lsp.enable）
+-- ----------------------------------------------------------------------------
+
+-- 为所有 LSP 注入 blink.cmp 的补全能力
+-- 放在具体 LSP 配置之前，具体配置可以覆盖这里的默认值
+vim.lsp.config["*"] = {
+	capabilities = require("blink.cmp").get_lsp_capabilities(),
+}
+
+-- lua_ls：Neovim 配置开发必备，告知 lua_ls `vim` 是合法全局变量
+vim.lsp.config("lua_ls", {
+	settings = {
+		Lua = {
+			diagnostics = { globals = { "vim" } },
+			telemetry = { enable = false },
+		},
+	},
+})
+
+-- 其他 LSP 使用默认配置（能力由上面的 "*" 注入）
+vim.lsp.config("pyright", {}) -- Python
+vim.lsp.config("bashls", {}) -- Bash/Shell
+vim.lsp.config("ts_ls", {}) -- TypeScript/JavaScript
+vim.lsp.config("gopls", {}) -- Go
+vim.lsp.config("clangd", {}) -- C/C++
+
+-- ----------------------------------------------------------------------------
+-- efm-langserver（统一的 linting 和 formatting 服务）
+-- ----------------------------------------------------------------------------
+-- efm 作为一个 LSP 服务器运行，将各种 CLI 工具（eslint_d、black 等）
+-- 包装成 LSP 协议，实现统一的 format/lint 接口
+do
+	-- linters
+	local luacheck = require("efmls-configs.linters.luacheck")
+	local flake8 = require("efmls-configs.linters.flake8")
+	local eslint_d = require("efmls-configs.linters.eslint_d")
+	local shellcheck = require("efmls-configs.linters.shellcheck")
+	local cpplint = require("efmls-configs.linters.cpplint")
+	local go_revive = require("efmls-configs.linters.go_revive")
+
+	-- formatters
+	local stylua = require("efmls-configs.formatters.stylua")
+	local black = require("efmls-configs.formatters.black")
+	local prettier_d = require("efmls-configs.formatters.prettier_d")
+	local fixjson = require("efmls-configs.formatters.fixjson")
+	local shfmt = require("efmls-configs.formatters.shfmt")
+	local clangfmt = require("efmls-configs.formatters.clang_format")
+	local gofumpt = require("efmls-configs.formatters.gofumpt")
+
+	vim.lsp.config("efm", {
+		-- efm 需要明确声明处理哪些文件类型
+		filetypes = {
+			"c",
+			"cpp",
+			"css",
+			"html",
+			"go",
+			"javascript",
+			"javascriptreact",
+			"json",
+			"jsonc",
+			"lua",
+			"markdown",
+			"python",
+			"sh",
+			"typescript",
+			"typescriptreact",
+			"vue",
+			"svelte",
+		},
+		-- 告知 efm 支持文档格式化（否则 vim.lsp.buf.format 不会调用它）
+		init_options = { documentFormatting = true },
+		settings = {
+			languages = {
+				c = { clangfmt, cpplint },
+				cpp = { clangfmt, cpplint },
+				css = { prettier_d },
+				go = { gofumpt, go_revive },
+				html = { prettier_d },
+				javascript = { eslint_d, prettier_d },
+				javascriptreact = { eslint_d, prettier_d },
+				json = { eslint_d, fixjson },
+				jsonc = { eslint_d, fixjson },
+				lua = { luacheck, stylua },
+				markdown = { prettier_d },
+				python = { flake8, black },
+				sh = { shellcheck, shfmt },
+				typescript = { eslint_d, prettier_d },
+				typescriptreact = { eslint_d, prettier_d },
+				vue = { eslint_d, prettier_d },
+				svelte = { eslint_d, prettier_d },
+			},
+		},
+	})
+end
+
+-- 启用所有配置好的 LSP（vim.lsp.enable 是 0.12 的新 API，替代 lspconfig 的 setup 调用）
+vim.lsp.enable({
+	"lua_ls",
+	"pyright",
+	"bashls",
+	"ts_ls",
+	"gopls",
+	"clangd",
+	"efm",
+})
+
+-- =============================================================================
+-- 浮动终端
+-- =============================================================================
+
+-- 终端缓冲区专属设置
+vim.api.nvim_create_autocmd("TermOpen", {
+	group = augroup,
+	callback = function()
+		vim.opt_local.number = false -- 终端不需要行号
+		vim.opt_local.relativenumber = false
+		vim.opt_local.signcolumn = "no" -- 终端不需要 sign 列
+	end,
+})
+
+-- 终端进程正常退出后自动关闭缓冲区（避免留下 [Process exited 0] 的残留 buffer）
+vim.api.nvim_create_autocmd("TermClose", {
+	group = augroup,
+	callback = function()
+		if vim.v.event.status == 0 then
+			vim.api.nvim_buf_delete(0, {})
+		end
+	end,
+})
+
+-- 浮动终端状态（跨调用持久化，实现 toggle 效果）
+local terminal_state = { buf = nil, win = nil, is_open = false }
+
+local function FloatingTerminal()
+	-- 如果终端窗口已打开，关闭它（toggle 行为）
+	if terminal_state.is_open and terminal_state.win and vim.api.nvim_win_is_valid(terminal_state.win) then
+		vim.api.nvim_win_close(terminal_state.win, false)
+		terminal_state.is_open = false
+		return
+	end
+
+	-- 复用已有的终端缓冲区（保留终端会话，不重新启动 shell）
+	if not terminal_state.buf or not vim.api.nvim_buf_is_valid(terminal_state.buf) then
+		terminal_state.buf = vim.api.nvim_create_buf(false, true)
+		-- bufhidden=hide：窗口关闭时隐藏缓冲区而非删除，保留终端状态
+		vim.bo[terminal_state.buf].bufhidden = "hide"
+	end
+
+	-- 居中浮窗，宽高各占编辑器的 80%
+	local width = math.floor(vim.o.columns * 0.8)
+	local height = math.floor(vim.o.lines * 0.8)
+	local row = math.floor((vim.o.lines - height) / 2)
+	local col = math.floor((vim.o.columns - width) / 2)
+
+	terminal_state.win = vim.api.nvim_open_win(terminal_state.buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		row = row,
+		col = col,
+		style = "minimal",
+		border = "rounded",
+	})
+
+	-- 浮窗透明背景
+	vim.wo[terminal_state.win].winblend = 0
+	vim.wo[terminal_state.win].winhighlight = "Normal:FloatingTermNormal,FloatBorder:FloatingTermBorder"
+	vim.api.nvim_set_hl(0, "FloatingTermNormal", { bg = "none" })
+	vim.api.nvim_set_hl(0, "FloatingTermBorder", { bg = "none" })
+
+	-- 仅在缓冲区还没有终端时启动 shell（复用时跳过）
+	if vim.bo[terminal_state.buf].buftype ~= "terminal" then
+		vim.fn.termopen(os.getenv("SHELL"))
+	end
+
+	terminal_state.is_open = true
+	vim.cmd("startinsert")
+
+	-- 离开终端缓冲区时自动关闭浮窗（once=true 避免重复触发）
+	local term_augroup = vim.api.nvim_create_augroup("FloatingTermLeave_" .. terminal_state.win, { clear = true })
+	vim.api.nvim_create_autocmd("BufLeave", {
+		group = term_augroup,
+		buffer = terminal_state.buf,
+		once = true,
+		callback = function()
+			if terminal_state.is_open and terminal_state.win and vim.api.nvim_win_is_valid(terminal_state.win) then
+				vim.api.nvim_win_close(terminal_state.win, false)
+				terminal_state.is_open = false
+			end
+		end,
+	})
+end
+
+-- 浮动终端快捷键
+vim.keymap.set("n", "<leader>t", FloatingTerminal, { noremap = true, silent = true, desc = "Toggle floating terminal" })
+
+-- 终端模式下 Esc 退出到 normal 模式（而非发送 Esc 给终端进程）
+vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { noremap = true, silent = true, desc = "Terminal: exit to normal mode" })
+
+-- 终端模式下 Ctrl+q 直接关闭浮窗
+vim.keymap.set("t", "<C-q>", function()
+	if terminal_state.is_open and terminal_state.win and vim.api.nvim_win_is_valid(terminal_state.win) then
+		vim.api.nvim_win_close(terminal_state.win, false)
+		terminal_state.is_open = false
+	end
+end, { noremap = true, silent = true, desc = "Terminal: close floating window" })

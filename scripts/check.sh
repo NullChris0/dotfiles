@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-packages=(zsh git i3 terminator mise assets)
+packages=(zsh git i3 terminator mise assets nvim)
 temp_home=$(mktemp -d)
 trap 'rm -rf "$temp_home"' EXIT
 
@@ -26,6 +26,10 @@ test -L "$temp_home/.config/i3/config"
 test -L "$temp_home/.config/terminator/config"
 test -L "$temp_home/.config/mise/config.toml"
 test -L "$temp_home/.local/share/dotfiles/wallpapers/bg-arc.png"
+test -L "$temp_home/.config/nvim/init.lua"
+test -L "$temp_home/.config/nvim/.luarc.json"
+test -L "$temp_home/.config/nvim/.luacheckrc"
+test -L "$temp_home/.config/nvim/nvim-pack-lock.json"
 
 printf 'Checking for home-directory paths and credential assignments...\n'
 hardcoded_home_path="/home/$USER"
