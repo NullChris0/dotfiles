@@ -12,7 +12,7 @@
 - 系统剪贴板使用 `unnamedplus`，需要系统提供 `xclip`、`xsel` 或 `wl-clipboard`。
 - 不创建 swap、backup、writebackup 文件。
 - Markdown、纯文本和 Git commit 会自动开启折行、整词折行和拼写检查。
-- 保存受支持文件时，如果当前 buffer 已附加 `efm`，会用 `efm` 自动格式化。
+- 保存受支持文件时，如果当前 buffer 已附加 `efm`，会用 `efm` 自动格式化；Java 例外，保存时使用 `jdtls` 格式化。
 
 ## 插件总览
 
@@ -27,6 +27,10 @@
 | `mason.nvim` | 安装 LSP、linter、formatter 等外部工具；不负责配置 LSP。 |
 | `nvim-lspconfig` | 提供各语言 LSP 的默认配置来源。 |
 | `efmls-configs-nvim` | 给 `efm-langserver` 提供常用 linter/formatter 配置。 |
+| `nvim-dap` | Debug Adapter Protocol 客户端，负责启动、控制和管理调试会话。 |
+| `nvim-dap-ui` | 调试 UI，显示 scopes、stacks、watches、breakpoints、REPL 和 console。 |
+| `nvim-nio` | `nvim-dap-ui` 的异步 IO 依赖。 |
+| `nvim-jdtls` | Java 专用 JDT LS 启动器，并把 Java debug/test bundles 接入 `nvim-dap`。 |
 | `blink.cmp` | 补全引擎，来源包括 LSP、路径、buffer 和 snippets。 |
 | `LuaSnip` | snippet 展开引擎，供 `blink.cmp` 调用。 |
 
@@ -42,10 +46,10 @@
 | `ts_ls` | TypeScript/JavaScript |
 | `gopls` | Go |
 | `clangd` | C/C++ |
-| `jdtls` | Java，`JAVA_HOME` 指向 mise 管理的 Temurin 21。 |
+| `jdtls` | Java，通过 `ftplugin/java.lua` 和 `nvim-jdtls` 启动，`JAVA_HOME` 指向 mise 管理的 Temurin 21。 |
 | `efm` | 统一承载 linting 和 formatting。 |
 
-`mason.nvim` 只负责安装工具，并把已安装工具加入 Neovim 可见的 `PATH`。真正启用哪些 LSP、formatter、linter 由 `vim.lsp.config`、`vim.lsp.enable` 和 `efm` 配置决定。换句话说，在 `:Mason` 里安装一个工具不会自动让它参与当前项目，仍需要在配置里启用。
+`mason.nvim` 只负责安装工具，并把已安装工具加入 Neovim 可见的 `PATH`。真正启用哪些 LSP、formatter、linter 由 `vim.lsp.config`、`vim.lsp.enable`、`ftplugin/java.lua` 和 `efm` 配置决定。换句话说，在 `:Mason` 里安装一个工具不会自动让它参与当前项目，仍需要在配置里启用。
 
 `efm` 当前接入的工具：
 
@@ -54,7 +58,22 @@
 | Linters | `luacheck`、`flake8`、`eslint_d`、`shellcheck`、`cpplint`、`revive` |
 | Formatters | `stylua`、`black`、`prettier_d`、`fixjson`、`shfmt`、`clang_format`、`gofumpt` |
 
-自动格式化只在 `efm` 已附加到当前 buffer 时运行，并且格式化请求会过滤到 `efm`，避免 TypeScript 等语言服务器抢占格式化。
+自动格式化只在指定 formatter 已附加到当前 buffer 时运行。非 Java 文件会过滤到 `efm`，避免 TypeScript 等语言服务器抢占格式化；Java 文件会过滤到 `jdtls`。
+
+## Java 调试与测试
+
+Java 使用 `nvim-jdtls` 从 `.config/nvim/ftplugin/java.lua` 启动，避免和全局 `vim.lsp.enable` 重复启动。项目根目录通过 `gradlew`、`mvnw`、`pom.xml`、`build.gradle`、`settings.gradle` 或 `.git` 识别，JDT LS workspace 位于 Neovim 数据目录的 `jdtls-workspaces/<project>` 下。
+
+`jdtls` 可执行文件必须在 `PATH` 里，否则打开 Java 文件时会提示 `jdtls not started: command not found in PATH`，补全、诊断、跳转和 Java 调试都不会生效。
+
+Java debug/test bundles 需要手动安装到 Neovim 数据目录：
+
+| Bundle | 路径 |
+| --- | --- |
+| `java-debug` | `stdpath("data")/java-debug/com.microsoft.java.debug.plugin-*.jar` |
+| `vscode-java-test` | `stdpath("data")/vscode-java-test/server/*.jar` |
+
+`vscode-java-test` 下的 `com.microsoft.java.test.runner-jar-with-dependencies.jar` 和 `jacocoagent.jar` 会被排除。未安装这些 bundles 时，Java LSP 仍会启动；安装后可用 `:DapNew` 发现 Java main classes，并使用 Java 测试调试快捷键。
 
 ## 补全
 
@@ -89,6 +108,7 @@ Markdown 文件不会自动弹出补全菜单，避免写作时过度打扰；�
 | organize imports | `<leader>oi` |
 | 保存 | `<leader>w` |
 | Git hunk 预览 | `<leader>hp` |
+| Debug continue | `<leader>vc` |
 | 打开浮动终端 | `<leader>t` |
 
 ## 快捷键速查
@@ -144,6 +164,25 @@ Markdown 文件不会自动弹出补全菜单，避免写作时过度打扰；�
 | `<leader>rn` | LSP rename |
 | `<leader>oi` | Organize imports，然后延迟格式化 |
 
+### Debug
+
+| 快捷键 | 作用 |
+| --- | --- |
+| `<leader>vc` | Continue / start debug session |
+| `<leader>vo` | Step over |
+| `<leader>vi` | Step into |
+| `<leader>vO` | Step out |
+| `<leader>vq` | Terminate debug session |
+| `<leader>vb` | Toggle breakpoint |
+| `<leader>vB` | Conditional breakpoint |
+| `<leader>vl` | Log point |
+| `<leader>vr` | Open debug REPL |
+| `<leader>vu` | Toggle debug UI |
+| `<leader>ve` | Eval expression，支持 Normal/Visual 模式 |
+| `<leader>vm` | Debug nearest Java test method |
+| `<leader>vT` | Debug current Java test class |
+| `<leader>vj` | Refresh Java debug config |
+
 ### Git Hunk
 
 | 快捷键 | 作用 |
@@ -195,4 +234,3 @@ Markdown 文件不会自动弹出补全菜单，避免写作时过度打扰；�
 | `J` | 合并行并保持光标位置 |
 | Visual `<` / `>` | 缩进后保持选区 |
 | `<A-j>` / `<A-k>` | 移动当前行或选区 |
-

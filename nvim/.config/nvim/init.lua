@@ -303,7 +303,7 @@ end, { desc = "Copy full file path" })
 -- 所有用户 autocmd 放在同一个 augroup 中，便于管理和避免重复注册
 local augroup = vim.api.nvim_create_augroup("UserConfig", { clear = true })
 
--- 保存时自动格式化（仅在 efm-langserver 已附加时执行）
+-- 保存时自动格式化（Java 使用 jdtls，其它语言仅在 efm-langserver 已附加时执行）
 vim.api.nvim_create_autocmd("BufWritePre", {
 	group = augroup,
 	pattern = {
@@ -325,6 +325,7 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 		"*.cpp",
 		"*.h",
 		"*.hpp",
+		"*.java",
 	},
 	callback = function(args)
 		-- 跳过特殊缓冲区（如 quickfix、terminal、prompt 等）
@@ -340,24 +341,24 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 			return
 		end
 
-		-- 检查 efm 是否已附加到当前缓冲区
-		local has_efm = false
+		local formatter = vim.bo[args.buf].filetype == "java" and "jdtls" or "efm"
+		local has_formatter = false
 		for _, c in ipairs(vim.lsp.get_clients({ bufnr = args.buf })) do
-			if c.name == "efm" then
-				has_efm = true
+			if c.name == formatter then
+				has_formatter = true
 				break
 			end
 		end
-		if not has_efm then
+		if not has_formatter then
 			return
 		end
 
-		-- 只使用 efm 格式化，避免其他 LSP（如 ts_ls）抢占格式化权
+		-- 只使用指定 formatter，避免其他 LSP（如 ts_ls）抢占格式化权
 		pcall(vim.lsp.buf.format, {
 			bufnr = args.buf,
 			timeout_ms = 2000,
 			filter = function(c)
-				return c.name == "efm"
+				return c.name == formatter
 			end,
 		})
 	end,
@@ -432,6 +433,12 @@ vim.pack.add({
 	"https://github.com/mason-org/mason.nvim",
 	-- efm-langserver 的预置 linter/formatter 配置
 	"https://github.com/creativenull/efmls-configs-nvim",
+	-- Debug Adapter Protocol 客户端与 UI
+	"https://github.com/mfussenegger/nvim-dap",
+	"https://github.com/rcarriga/nvim-dap-ui",
+	"https://github.com/nvim-neotest/nvim-nio",
+	-- Java LSP 扩展，提供 JDT LS debug/test 集成
+	"https://github.com/mfussenegger/nvim-jdtls",
 	-- 补全引擎（需要 Rust toolchain 构建，或使用预编译二进制）
 	{
 		src = "https://github.com/saghen/blink.cmp",
@@ -458,9 +465,13 @@ wk.setup({
 })
 
 wk.add({
-	{ "<leader>?", function()
-		wk.show({ global = false })
-	end, desc = "Show buffer-local keymaps" },
+	{
+		"<leader>?",
+		function()
+			wk.show({ global = false })
+		end,
+		desc = "Show buffer-local keymaps",
+	},
 	{ "<leader>b", group = "buffer" },
 	{ "<leader>c", group = "code" },
 	{ "<leader>d", group = "diagnostics" },
@@ -474,9 +485,47 @@ wk.add({
 	{ "<leader>r", group = "rename/refactor" },
 	{ "<leader>s", group = "split" },
 	{ "<leader>t", desc = "Toggle floating terminal" },
+	{ "<leader>v", group = "debug" },
 	{ "<leader>w", group = "write/window" },
 	{ "<leader>x", desc = "Delete without yanking" },
 })
+
+-- ----------------------------------------------------------------------------
+-- nvim-dap / nvim-dap-ui（Debug Adapter Protocol）
+-- ----------------------------------------------------------------------------
+local dap = require("dap")
+local dapui = require("dapui")
+
+dapui.setup({})
+
+dap.listeners.before.attach.dapui_config = function()
+	dapui.open()
+end
+dap.listeners.before.launch.dapui_config = function()
+	dapui.open()
+end
+dap.listeners.before.event_terminated.dapui_config = function()
+	dapui.close()
+end
+dap.listeners.before.event_exited.dapui_config = function()
+	dapui.close()
+end
+
+vim.keymap.set("n", "<leader>vc", dap.continue, { desc = "Debug continue" })
+vim.keymap.set("n", "<leader>vo", dap.step_over, { desc = "Debug step over" })
+vim.keymap.set("n", "<leader>vi", dap.step_into, { desc = "Debug step into" })
+vim.keymap.set("n", "<leader>vO", dap.step_out, { desc = "Debug step out" })
+vim.keymap.set("n", "<leader>vq", dap.terminate, { desc = "Debug terminate" })
+vim.keymap.set("n", "<leader>vb", dap.toggle_breakpoint, { desc = "Debug toggle breakpoint" })
+vim.keymap.set("n", "<leader>vB", function()
+	dap.set_breakpoint(vim.fn.input("Breakpoint condition: "))
+end, { desc = "Debug conditional breakpoint" })
+vim.keymap.set("n", "<leader>vl", function()
+	dap.set_breakpoint(nil, nil, vim.fn.input("Log point message: "))
+end, { desc = "Debug log point" })
+vim.keymap.set("n", "<leader>vr", dap.repl.open, { desc = "Debug REPL" })
+vim.keymap.set("n", "<leader>vu", dapui.toggle, { desc = "Debug UI toggle" })
+vim.keymap.set({ "n", "v" }, "<leader>ve", dapui.eval, { desc = "Debug eval" })
 
 -- ----------------------------------------------------------------------------
 -- nvim-tree（文件树）
@@ -853,11 +902,6 @@ vim.lsp.config("bashls", {}) -- Bash/Shell
 vim.lsp.config("ts_ls", {}) -- TypeScript/JavaScript
 vim.lsp.config("gopls", {}) -- Go
 vim.lsp.config("clangd", {}) -- C/C++
-vim.lsp.config("jdtls", {
-	cmd_env = {
-		JAVA_HOME = vim.fn.expand("~/.local/share/mise/installs/java/temurin-21.0.11+10.0.LTS"),
-	},
-}) -- Java
 
 -- ----------------------------------------------------------------------------
 -- efm-langserver（统一的 linting 和 formatting 服务）
@@ -937,7 +981,6 @@ vim.lsp.enable({
 	"ts_ls",
 	"gopls",
 	"clangd",
-	"jdtls",
 	"efm",
 })
 

@@ -30,6 +30,7 @@ test -L "$temp_home/.config/nvim/init.lua"
 test -L "$temp_home/.config/nvim/.luarc.json"
 test -L "$temp_home/.config/nvim/.luacheckrc"
 test -L "$temp_home/.config/nvim/nvim-pack-lock.json"
+test -L "$temp_home/.config/nvim/ftplugin/java.lua"
 
 printf 'Checking for home-directory paths and credential assignments...\n'
 hardcoded_home_path="/home/$USER"

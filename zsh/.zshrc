@@ -134,3 +134,5 @@ eval "$(direnv hook zsh)"
 
 # Tool-version manager; keep near the end
 eval "$(mise activate zsh)"
+
+alias gitfourchette="QT_SCALE_FACTOR=1.25 $HOME/projects/opensource/gitfourchette/.venv/bin/gitfourchette"
