@@ -4,12 +4,11 @@
 [profiles]
   [[default]]
     background_color = "#2e3436"
-    show_titlebar = False
-    show_scollbar = False
     background_darkness = 0.85
     background_type = transparent
-    font = Ubuntu Sans Mono 18
+    font = FiraCode Nerd Font Propo 18
     foreground_color = "#ffffff"
+    show_titlebar = False
     use_system_font = False
 [layouts]
   [[default]]
