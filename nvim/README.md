@@ -24,6 +24,7 @@
 | `which-key.nvim` | 按下 leader 后显示可用快捷键和分组。 |
 | `gitsigns.nvim` | Git sign、hunk 导航、stage/reset/preview、blame 和 diff。 |
 | `nvim-treesitter` | 语法高亮和基于语法树的折叠。 |
+| `render-markdown.nvim` | 在 Neovim 内直接渲染 Markdown 标题、列表、表格、引用、代码块等元素。 |
 | `mason.nvim` | 安装 LSP、linter、formatter 等外部工具；不负责配置 LSP。 |
 | `nvim-lspconfig` | 提供各语言 LSP 的默认配置来源。 |
 | `efmls-configs-nvim` | 给 `efm-langserver` 提供常用 linter/formatter 配置。 |
@@ -195,6 +196,12 @@ Markdown 文件不会自动弹出补全菜单，避免写作时过度打扰；�
 | `<leader>hb` | 当前行 blame |
 | `<leader>hB` | 切换行内 blame |
 | `<leader>hd` | Diff this |
+
+### Markdown
+
+| 快捷键 | 作用 |
+| --- | --- |
+| `<leader>mr` | 开关 Markdown 内联渲染 |
 
 ### Path / Paste
 

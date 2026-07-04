@@ -427,6 +427,8 @@ vim.pack.add({
 		branch = "main",
 		build = ":TSUpdate", -- 安装/更新后自动编译 parser
 	},
+	-- Markdown 内联渲染增强
+	"https://github.com/MeanderingProgrammer/render-markdown.nvim",
 	-- LSP 配置
 	"https://github.com/neovim/nvim-lspconfig",
 	-- LSP/格式化工具安装管理器
@@ -479,6 +481,7 @@ wk.add({
 	{ "<leader>f", group = "find" },
 	{ "<leader>g", group = "goto" },
 	{ "<leader>h", group = "git hunk" },
+	{ "<leader>m", group = "markdown" },
 	{ "<leader>o", group = "organize" },
 	{ "<leader>p", group = "path/paste" },
 	{ "<leader>q", desc = "Open diagnostic list" },
@@ -587,6 +590,17 @@ require("mini.notify").setup({}) -- 浮窗通知替代 vim.notify
 require("mini.icons").setup({}) -- 图标支持（供 fzf-lua、nvim-tree 等使用）
 
 -- ----------------------------------------------------------------------------
+-- render-markdown.nvim（Markdown 内联渲染）
+-- ----------------------------------------------------------------------------
+require("render-markdown").setup({
+	completions = { lsp = { enabled = true } },
+})
+
+vim.keymap.set("n", "<leader>mr", function()
+	require("render-markdown").toggle()
+end, { desc = "Toggle Markdown rendering" })
+
+-- ----------------------------------------------------------------------------
 -- gitsigns.nvim（Git 集成）
 -- ----------------------------------------------------------------------------
 require("gitsigns").setup({
@@ -655,6 +669,7 @@ local function setup_treesitter()
 		"vue",
 		"svelte",
 		"markdown",
+		"markdown_inline",
 		"python",
 		"java",
 		"rust",
@@ -1075,7 +1090,8 @@ end
 vim.keymap.set("n", "<leader>t", FloatingTerminal, { noremap = true, silent = true, desc = "Toggle floating terminal" })
 
 -- 终端模式下 Esc 退出到 normal 模式（而非发送 Esc 给终端进程）
-vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", { noremap = true, silent = true, desc = "Terminal: exit to normal mode" })
+-- vim.keymap.set("t", "<Esc>", "<C-\\><C-n>",
+-- { noremap = true, silent = true, desc = "Terminal: exit to normal mode" })
 
 -- 终端模式下 Ctrl+q 直接关闭浮窗
 vim.keymap.set("t", "<C-q>", function()
