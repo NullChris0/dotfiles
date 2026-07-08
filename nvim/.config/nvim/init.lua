@@ -429,6 +429,8 @@ vim.pack.add({
 	},
 	-- Markdown 内联渲染增强
 	"https://github.com/MeanderingProgrammer/render-markdown.nvim",
+	-- HTTP 请求执行与响应查看
+	"https://github.com/rest-nvim/rest.nvim",
 	-- LSP 配置
 	"https://github.com/neovim/nvim-lspconfig",
 	-- LSP/格式化工具安装管理器
@@ -486,6 +488,7 @@ wk.add({
 	{ "<leader>p", group = "path/paste" },
 	{ "<leader>q", desc = "Open diagnostic list" },
 	{ "<leader>r", group = "rename/refactor" },
+	{ "<leader>R", group = "rest" },
 	{ "<leader>s", group = "split" },
 	{ "<leader>t", desc = "Toggle floating terminal" },
 	{ "<leader>v", group = "debug" },
@@ -553,7 +556,20 @@ vim.api.nvim_set_hl(0, "NvimTreeWinSeparator", { fg = "#2a2a2a", bg = "none" })
 -- ----------------------------------------------------------------------------
 -- fzf-lua（模糊查找）
 -- ----------------------------------------------------------------------------
-require("fzf-lua").setup({})
+do
+	local ok, fzf_lua = pcall(require, "fzf-lua")
+	if ok then
+		fzf_lua.setup({
+			files = {
+				fd_opts = { "--exclude", "node_modules", "--exclude", ".git" },
+			},
+		})
+	else
+		vim.schedule(function()
+			vim.notify("fzf-lua unavailable: " .. tostring(fzf_lua), vim.log.levels.WARN)
+		end)
+	end
+end
 
 vim.keymap.set("n", "<leader>ff", function()
 	require("fzf-lua").files()
@@ -599,6 +615,22 @@ require("render-markdown").setup({
 vim.keymap.set("n", "<leader>mr", function()
 	require("render-markdown").toggle()
 end, { desc = "Toggle Markdown rendering" })
+
+-- ----------------------------------------------------------------------------
+-- rest.nvim（HTTP 请求）
+-- ----------------------------------------------------------------------------
+require("rest-nvim").setup({
+	result_split_horizontal = false,
+	skip_ssl_verification = false,
+	highlight = {
+		enabled = true,
+		timeout = 150,
+	},
+})
+
+vim.keymap.set("n", "<leader>Rr", "<Plug>RestNvim", { desc = "Run HTTP request" })
+vim.keymap.set("n", "<leader>Rp", "<Plug>RestNvimPreview", { desc = "Preview HTTP request" })
+vim.keymap.set("n", "<leader>Rl", "<Plug>RestNvimLast", { desc = "Re-run last HTTP request" })
 
 -- ----------------------------------------------------------------------------
 -- gitsigns.nvim（Git 集成）
