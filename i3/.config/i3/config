@@ -227,3 +227,5 @@ bindsym $mod+x exec /home/$USER/.config/scripts/lock
 # deligate apps to workspace
 for_window [class="firefox_firefox"] move to workspace $ws2
 for_window [class="Cat.cloud"] move to workspace $ws3
+
+exec_always --no-startup-id ~/.local/bin/start-showmethekey
