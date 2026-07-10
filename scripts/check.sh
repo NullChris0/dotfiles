@@ -12,6 +12,7 @@ zsh -n "$repo_root/zsh/.zprofile"
 zsh -n "$repo_root/zsh/.p10k.zsh"
 bash -n "$repo_root/scripts/bootstrap.sh"
 bash -n "$repo_root/scripts/check.sh"
+bash -n "$repo_root/scripts/clear_trust_agents.sh"
 
 printf 'Checking Git configuration syntax...\n'
 git config --file "$repo_root/git/.gitconfig" --list >/dev/null
