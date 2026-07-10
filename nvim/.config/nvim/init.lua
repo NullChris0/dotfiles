@@ -559,11 +559,7 @@ vim.api.nvim_set_hl(0, "NvimTreeWinSeparator", { fg = "#2a2a2a", bg = "none" })
 do
 	local ok, fzf_lua = pcall(require, "fzf-lua")
 	if ok then
-		fzf_lua.setup({
-			files = {
-				fd_opts = { "--exclude", "node_modules", "--exclude", ".git" },
-			},
-		})
+		fzf_lua.setup({})
 	else
 		vim.schedule(function()
 			vim.notify("fzf-lua unavailable: " .. tostring(fzf_lua), vim.log.levels.WARN)
