@@ -129,6 +129,18 @@ join_ere() {
   printf '%s' "$joined"
 }
 
+matches_process_pattern() {
+  local target="$1" expr="$2" restore_nocasematch=0 result=1
+
+  if ! shopt -q nocasematch; then
+    shopt -s nocasematch
+    restore_nocasematch=1
+  fi
+  [[ "$target" =~ $expr ]] && result=0
+  ((restore_nocasematch == 0)) || shopt -u nocasematch
+  return "$result"
+}
+
 run_or_print() {
   printf '+'
   printf ' %q' "$@"
@@ -177,19 +189,88 @@ matching_units() {
 }
 
 find_targets() {
-  local expr
+  local expr line pid owner command executable arguments
   expr="$(join_ere "${process_patterns[@]}")"
 
-  ps -eo pid=,user=,comm=,args= |
-    awk -v me="$self_pid" '$1 != me { print }' |
-    grep -E -i "$expr" |
-    grep -v -E '(^|[[:space:]])(grep|awk|systemctl|sudo|clear_trust_agents\.sh)([[:space:]]|$)' || true
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    read -r pid owner command executable arguments <<<"$line"
+    [[ "$pid" == "$self_pid" ]] && continue
+    case "$command" in
+      grep|awk|systemctl|sudo|clear_trust_agents.sh) continue ;;
+    esac
+
+    if is_qianxin_kill_target "$line" || matches_process_pattern "$line" "$expr"; then
+      printf '%s\n' "$line"
+    fi
+  done < <(ps -eo pid=,user=,comm=,exe=,args=)
 }
 
 is_qianxin_kill_target() {
-  local target="$1"
+  local target="$1" pid owner command executable arguments command_path
 
-  [[ "$target" =~ (^|[[:space:]/])(qaxsafed|qaxtqdown)([[:space:]]|$) ]]
+  read -r pid owner command executable arguments <<<"$target"
+  read -r command_path _ <<<"$arguments"
+
+  [[ "$executable" == /opt/qaxsafe/* || "$command_path" == /opt/qaxsafe/* ]]
+}
+
+find_qianxin_targets() {
+  local line
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    is_qianxin_kill_target "$line" && printf '%s\n' "$line"
+  done < <(find_targets)
+}
+
+target_pids() {
+  local line pid
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    read -r pid _ <<<"$line"
+    [[ -z "$pid" ]] || printf '%s\n' "$pid"
+  done
+}
+
+qianxin_process_role() {
+  local target="$1" pid owner command executable arguments command_path process_path basename
+
+  read -r pid owner command executable arguments <<<"$target"
+  read -r command_path _ <<<"$arguments"
+  if [[ "$command_path" == /opt/qaxsafe/* ]]; then
+    process_path="$command_path"
+  else
+    process_path="$executable"
+  fi
+  basename="${process_path##*/}"
+  basename="${basename,,}"
+
+  if [[ "$owner" == root && "$basename" =~ ^qaxsafed(_[[:digit:]]+)?$ ]]; then
+    printf 'daemon\n'
+  elif [[ "$owner" == "$current_user" && "$basename" =~ ^qaxtray(_[[:digit:]]+)?$ ]]; then
+    printf 'tray\n'
+  fi
+}
+
+is_qianxin_unit() {
+  local unit="${1,,}"
+
+  [[ "$unit" =~ qianxin|qax|tianqing|skylar|xagt|奇安信 ]]
+}
+
+install_qianxin_stop_override() {
+  local unit="$1"
+  local drop_in_dir="/run/systemd/system/${unit}.d"
+  local drop_in_path="$drop_in_dir/90-clear-trust-agents.conf"
+  local contents=$'[Unit]\nRefuseManualStop=no\n'
+
+  run_or_print sudo mkdir -p "$drop_in_dir"
+  printf '+ sudo tee %q <<EOF\n%sEOF\n' "$drop_in_path" "$contents"
+  if [[ "$dry_run" -eq 0 ]]; then
+    printf '%s' "$contents" | sudo tee "$drop_in_path" >/dev/null
+  fi
 }
 
 show_status() {
@@ -241,7 +322,8 @@ confirm_destructive_action() {
 }
 
 stop_services() {
-  local user_units system_units unit
+  local user_units system_units unit refuse_manual_stop
+  local qianxin_units="" override_installed=0 active_qianxin_units=""
 
   [[ "$manage_services" -eq 1 ]] || return 0
 
@@ -270,15 +352,105 @@ stop_services() {
 
     echo "Stopping matching system services:"
     printf '%s\n' "$system_units"
+
+    while read -r unit; do
+      [[ -z "$unit" ]] && continue
+      is_qianxin_unit "$unit" || continue
+      qianxin_units="${qianxin_units}${unit}"$'\n'
+      refuse_manual_stop="$(systemctl show "$unit" -p RefuseManualStop --value 2>/dev/null || true)"
+      if [[ "$refuse_manual_stop" == "yes" ]]; then
+        echo "Installing runtime stop override for protected QiAnXin unit: $unit"
+        install_qianxin_stop_override "$unit"
+        override_installed=1
+      fi
+    done <<<"$system_units"
+
+    if [[ "$override_installed" -eq 1 ]]; then
+      run_or_print sudo systemctl daemon-reload
+    fi
+
     while read -r unit; do
       [[ -z "$unit" ]] && continue
       run_or_print sudo systemctl stop "$unit" || true
     done <<<"$system_units"
+
+    [[ "$dry_run" -eq 0 ]] || return 0
+    while read -r unit; do
+      [[ -z "$unit" ]] && continue
+      if systemctl is-active --quiet "$unit"; then
+        active_qianxin_units="${active_qianxin_units}${unit}"$'\n'
+      fi
+    done <<<"$qianxin_units"
+
+    if [[ -n "$active_qianxin_units" ]]; then
+      echo "QiAnXin system services are still active:" >&2
+      printf '%s' "$active_qianxin_units" >&2
+      return 1
+    fi
   fi
+}
+
+verify_qianxin_recovery() {
+  local qianxin_system_units="$1" qianxin_user_units="$2"
+  local unit targets line role
+  local daemon_required=0 tray_required=0 daemon_running=0 tray_running=0
+  local services_active=1 attempt
+
+  [[ -n "$qianxin_system_units" ]] && daemon_required=1
+  [[ -n "$qianxin_user_units" ]] && tray_required=1
+  ((daemon_required == 1 || tray_required == 1)) || return 0
+
+  while IFS= read -r unit; do
+    [[ -z "$unit" ]] && continue
+    if ! systemctl is-active --quiet "$unit"; then
+      echo "QiAnXin system service did not become active: $unit" >&2
+      services_active=0
+    fi
+  done <<<"$qianxin_system_units"
+
+  for attempt in 1 2 3 4 5; do
+    targets="$(find_qianxin_targets)"
+    daemon_running=0
+    tray_running=0
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      role="$(qianxin_process_role "$line")"
+      [[ "$role" == daemon ]] && daemon_running=1
+      [[ "$role" == tray ]] && tray_running=1
+    done <<<"$targets"
+
+    if ((daemon_required == 0 || daemon_running == 1)) &&
+      ((tray_required == 0 || tray_running == 1)); then
+      break
+    fi
+    ((attempt == 5)) || sleep 1
+  done
+
+  if ((daemon_required == 1 && daemon_running == 0)); then
+    echo "QiAnXin daemon process did not recover." >&2
+    services_active=0
+  fi
+  if ((tray_required == 1 && tray_running == 0)); then
+    echo "QiAnXin tray process did not recover." >&2
+    services_active=0
+  fi
+
+  if ((services_active == 1)); then
+    if ((daemon_required == 1 && tray_required == 1)); then
+      echo "QiAnXin daemon and tray processes are running."
+    elif ((daemon_required == 1)); then
+      echo "QiAnXin daemon process is running."
+    else
+      echo "QiAnXin tray process is running."
+    fi
+    return 0
+  fi
+  return 1
 }
 
 start_services() {
   local user_units system_units unit
+  local qianxin_user_units="" qianxin_system_units=""
 
   [[ "$manage_services" -eq 1 ]] || return 0
 
@@ -288,15 +460,6 @@ start_services() {
   if [[ -z "$user_units" && -z "$system_units" ]]; then
     echo "No matching systemd services found to start."
     return 0
-  fi
-
-  if [[ -n "$user_units" ]]; then
-    echo "Starting matching user services:"
-    printf '%s\n' "$user_units"
-    while read -r unit; do
-      [[ -z "$unit" ]] && continue
-      run_or_print systemctl --user start "$unit" || true
-    done <<<"$user_units"
   fi
 
   if [[ -n "$system_units" ]]; then
@@ -309,60 +472,69 @@ start_services() {
     printf '%s\n' "$system_units"
     while read -r unit; do
       [[ -z "$unit" ]] && continue
+      if is_qianxin_unit "$unit"; then
+        qianxin_system_units="${qianxin_system_units}${unit}"$'\n'
+      fi
       run_or_print sudo systemctl start "$unit" || true
     done <<<"$system_units"
   fi
+
+  if [[ -n "$user_units" ]]; then
+    echo "Starting matching user services:"
+    printf '%s\n' "$user_units"
+    while read -r unit; do
+      [[ -z "$unit" ]] && continue
+      if is_qianxin_unit "$unit"; then
+        qianxin_user_units="${qianxin_user_units}${unit}"$'\n'
+      fi
+      run_or_print systemctl --user start "$unit" || true
+    done <<<"$user_units"
+  fi
+
+  [[ "$dry_run" -eq 0 ]] || return 0
+  verify_qianxin_recovery "$qianxin_system_units" "$qianxin_user_units"
 }
 
-terminate_processes() {
-  local targets term_pids kill_pids alive_pids pid line
+kill_qianxin_processes() {
+  local targets="$1" round
+  local -a pids=()
 
-  [[ "$manage_processes" -eq 1 ]] || return 0
+  for round in 1 2 3; do
+    mapfile -t pids < <(target_pids <<<"$targets")
+    ((${#pids[@]} > 0)) || return 0
 
-  targets="$(find_targets)"
-  if [[ -z "$targets" ]]; then
-    echo "No matching aTrust/QiAnXin/Sangfor processes found."
-    return 0
-  fi
+    echo "Sending SIGKILL to QiAnXin processes (round $round/3):"
+    printf '%s\n' "${pids[@]}"
+    run_or_print sudo kill -KILL "${pids[@]}" || true
 
-  echo "Terminating matching processes:"
-  printf '%s\n' "$targets"
-  term_pids=""
-  kill_pids=""
+    [[ "$dry_run" -eq 0 ]] || return 0
+    sleep 1
+    targets="$(find_qianxin_targets)"
+    [[ -n "$targets" ]] || {
+      echo "QiAnXin processes terminated."
+      return 0
+    }
+  done
 
-  while read -r line; do
-    [[ -z "$line" ]] && continue
-    read -r pid _ <<<"$line"
+  echo "QiAnXin processes are still running after three SIGKILL rounds:" >&2
+  printf '%s\n' "$targets" >&2
+  return 1
+}
+
+terminate_other_processes() {
+  local targets="$1" term_pids alive_pids pid line
+
+  [[ -n "$targets" ]] || return 0
+
+  term_pids="$(target_pids <<<"$targets")"
+  echo "Sending SIGTERM to remaining matched processes:"
+  printf '%s\n' "$term_pids"
+  while read -r pid; do
     [[ -z "$pid" ]] && continue
+    run_or_print sudo kill -TERM "$pid" || true
+  done <<<"$term_pids"
 
-    if is_qianxin_kill_target "$line"; then
-      kill_pids="${kill_pids}${pid}"$'\n'
-    else
-      term_pids="${term_pids}${pid}"$'\n'
-    fi
-  done <<<"$targets"
-
-  if [[ -n "$kill_pids" ]]; then
-    echo "Sending SIGKILL to QiAnXin protected processes:"
-    printf '%s\n' "$kill_pids"
-    while read -r pid; do
-      [[ -z "$pid" ]] && continue
-      run_or_print sudo kill -KILL "$pid" || true
-    done <<<"$kill_pids"
-  fi
-
-  if [[ -n "$term_pids" ]]; then
-    echo "Sending SIGTERM to remaining matched processes:"
-    printf '%s\n' "$term_pids"
-    while read -r pid; do
-      [[ -z "$pid" ]] && continue
-      run_or_print sudo kill -TERM "$pid" || true
-    done <<<"$term_pids"
-  fi
-
-  [[ "$dry_run" -eq 1 ]] && return 0
-  [[ -n "$term_pids" ]] || return 0
-
+  [[ "$dry_run" -eq 0 ]] || return 0
   sleep 2
 
   alive_pids=""
@@ -387,28 +559,71 @@ terminate_processes() {
       return 1
     fi
   else
-    echo "Matched processes terminated."
+    echo "Matched non-QiAnXin processes terminated."
   fi
 }
 
+terminate_processes() {
+  local targets qianxin_targets="" other_targets="" line result=0
+
+  [[ "$manage_processes" -eq 1 ]] || return 0
+
+  targets="$(find_targets)"
+  if [[ -z "$targets" ]]; then
+    echo "No matching aTrust/QiAnXin/Sangfor processes found."
+    return 0
+  fi
+
+  echo "Terminating matching processes:"
+  printf '%s\n' "$targets"
+
+  while read -r line; do
+    [[ -z "$line" ]] && continue
+    if is_qianxin_kill_target "$line"; then
+      qianxin_targets="${qianxin_targets}${line}"$'\n'
+    else
+      other_targets="${other_targets}${line}"$'\n'
+    fi
+  done <<<"$targets"
+
+  if [[ -n "$qianxin_targets" ]]; then
+    kill_qianxin_processes "$qianxin_targets" || result=1
+  fi
+  if [[ -n "$other_targets" ]]; then
+    terminate_other_processes "$other_targets" || result=1
+  fi
+
+  return "$result"
+}
+
 stop_all() {
+  local result=0
+
   show_status
   confirm_destructive_action "Stop matching services and terminate matching processes?" || return 1
-  stop_services
-  terminate_processes
+  stop_services || result=1
+  terminate_processes || result=1
+  return "$result"
 }
 
 restart_all() {
+  local cleanup_result=0
+
   show_status
   confirm_destructive_action "Restart matching services and terminate matching processes first?" || return 1
-  stop_services
-  terminate_processes
+  stop_services || cleanup_result=1
+  terminate_processes || cleanup_result=1
+  ((cleanup_result == 0)) || return 1
   start_services
 }
 
 if [[ "$clean_proxy" -eq 1 ]]; then
-  clear_proxy_env
-  echo "Proxy variables cleared in this script process."
+  if [[ "$dry_run" -eq 1 ]]; then
+    echo "+ unset proxy variables in this script process"
+  else
+    clear_proxy_env
+    echo "Proxy variables cleared in this script process."
+  fi
 fi
 
 if [[ "$no_kill" -eq 1 ]]; then

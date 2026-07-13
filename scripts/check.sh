@@ -13,6 +13,12 @@ zsh -n "$repo_root/zsh/.p10k.zsh"
 bash -n "$repo_root/scripts/bootstrap.sh"
 bash -n "$repo_root/scripts/check.sh"
 bash -n "$repo_root/scripts/clear_trust_agents.sh"
+if [[ -f "$HOME/clear_trust_agents.sh" ]]; then
+  bash -n "$HOME/clear_trust_agents.sh"
+fi
+
+printf 'Running clear_trust_agents behavior tests...\n'
+bash "$repo_root/tests/test_clear_trust_agents.sh"
 
 printf 'Checking Git configuration syntax...\n'
 git config --file "$repo_root/git/.gitconfig" --list >/dev/null
