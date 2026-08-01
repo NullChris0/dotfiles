@@ -4,8 +4,74 @@
 
 -- 启用 24-bit 真彩色支持（终端需支持）
 vim.opt.termguicolors = true
--- 设置配色方案（habamax 是 Neovim 内置配色）
+
+-- 透明背景：去掉编辑区/侧栏/浮窗等实心底色，露出终端（或 picom）背景。
+-- 换 colorscheme 后会经 ColorScheme 自动重跑；保留各高亮组的 fg/样式。
+local function apply_transparent_bg()
+	local groups = {
+		"Normal",
+		"NormalNC",
+		"NormalFloat",
+		"FloatBorder",
+		"FloatTitle",
+		"SignColumn",
+		"EndOfBuffer",
+		"LineNr",
+		"CursorLineNr",
+		"Folded",
+		"FoldColumn",
+		"WinSeparator",
+		"VertSplit",
+		"StatusLine",
+		"StatusLineNC",
+		"TabLine",
+		"TabLineFill",
+		"TabLineSel",
+		"Pmenu",
+		"PmenuSbar",
+		"NvimTreeNormal",
+		"NvimTreeNormalNC",
+		"NvimTreeEndOfBuffer",
+		"NvimTreeSignColumn",
+		"NvimTreeWinSeparator",
+		"TelescopeNormal",
+		"TelescopeBorder",
+		"TelescopePromptNormal",
+	}
+
+	for _, group in ipairs(groups) do
+		local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
+		if not ok then
+			hl = {}
+		end
+		vim.api.nvim_set_hl(0, group, {
+			fg = hl.fg,
+			bg = "NONE",
+			sp = hl.sp,
+			bold = hl.bold,
+			italic = hl.italic,
+			underline = hl.underline,
+			undercurl = hl.undercurl,
+			strikethrough = hl.strikethrough,
+			reverse = hl.reverse,
+			ctermfg = hl.ctermfg,
+			ctermbg = "NONE",
+		})
+	end
+
+	-- 分隔线仅保留前景，避免实心条
+	vim.api.nvim_set_hl(0, "NvimTreeWinSeparator", { fg = "#2a2a2a", bg = "NONE" })
+	vim.api.nvim_set_hl(0, "WinSeparator", { fg = "#2a2a2a", bg = "NONE" })
+end
+
+-- 设置配色方案（onedark.vim，装在 site/pack/themes）
 vim.cmd.colorscheme("onedark")
+apply_transparent_bg()
+
+vim.api.nvim_create_autocmd("ColorScheme", {
+	group = vim.api.nvim_create_augroup("TransparentBG", { clear = true }),
+	callback = apply_transparent_bg,
+})
 
 -- leader 键设置为空格，需要在所有 keymap 之前设置
 vim.g.mapleader = " "
@@ -304,13 +370,294 @@ end, { desc = "Copy full file path" })
 -- end, { desc = "Toggle diagnostics" })
 
 -- =============================================================================
+-- 格式化策略（方案 C：有项目配置才自动 format + 可 toggle）
+-- =============================================================================
+-- 前端痛点：无 Prettier、仅 ESLint 的仓库（如公司 Vue 项目）若仍跑 prettierd，
+-- 会把分号/引号改成 Prettier 默认，与 .eslintrc / antfu eslint --fix 冲突。
+-- 规则：
+--   - prettier 配置存在 → 用 efm/prettierd（尊重项目配置）
+--   - 仅 eslint 配置 → 用项目本地 eslint --fix-to-stdout（不跑 prettier）
+--   - 都没有 → 保存时不格式化
+--   - 其它语言：见 marker 表；Java 仍走 jdtls
+-- 开关：vim.g.disable_autoformat / vim.b.disable_autoformat
+--       <leader>uf 全局 toggle，<leader>uF 当前 buffer toggle，<leader>fm 手动 format
+
+local format_config = {
+	prettier_markers = {
+		".prettierrc",
+		".prettierrc.json",
+		".prettierrc.js",
+		".prettierrc.cjs",
+		".prettierrc.mjs",
+		".prettierrc.yml",
+		".prettierrc.yaml",
+		".prettierrc.toml",
+		".prettierrc.json5",
+		"prettier.config.js",
+		"prettier.config.cjs",
+		"prettier.config.mjs",
+	},
+	eslint_markers = {
+		".eslintrc",
+		".eslintrc.js",
+		".eslintrc.cjs",
+		".eslintrc.json",
+		".eslintrc.yml",
+		".eslintrc.yaml",
+		"eslint.config.js",
+		"eslint.config.cjs",
+		"eslint.config.mjs",
+		"eslint.config.ts",
+	},
+	-- 非前端：存在任一 marker 才允许自动 format（通过 efm/jdtls）
+	markers_by_ft = {
+		lua = { "stylua.toml", ".stylua.toml" },
+		python = { "pyproject.toml", "setup.cfg", "black.toml", ".black" },
+		go = { "go.mod", "go.work" },
+		c = { ".clang-format" },
+		cpp = { ".clang-format" },
+		-- sh/bash：无通用项目 marker，默认允许 shfmt（冲突少）
+		sh = true,
+		bash = true,
+		zsh = true,
+		java = true, -- jdtls
+	},
+	frontend_fts = {
+		javascript = true,
+		javascriptreact = true,
+		typescript = true,
+		typescriptreact = true,
+		vue = true,
+		svelte = true,
+		css = true,
+		scss = true,
+		less = true,
+		html = true,
+		json = true,
+		jsonc = true,
+		markdown = true,
+	},
+	-- 可用 eslint --fix 的 filetype（antfu formatters 也会管一部分 css/html/vue）
+	eslint_fix_fts = {
+		javascript = true,
+		javascriptreact = true,
+		typescript = true,
+		typescriptreact = true,
+		vue = true,
+		svelte = true,
+		css = true,
+		scss = true,
+		less = true,
+		html = true,
+		json = true,
+		jsonc = true,
+		markdown = true,
+	},
+}
+
+local function format_root_for(path, markers)
+	if type(markers) ~= "table" then
+		return nil
+	end
+	return vim.fs.root(path, markers)
+end
+
+local function lsp_format(bufnr, client_name)
+	local has = false
+	for _, c in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+		if c.name == client_name then
+			has = true
+			break
+		end
+	end
+	if not has then
+		return false, "no " .. client_name .. " client"
+	end
+	local ok, err = pcall(vim.lsp.buf.format, {
+		bufnr = bufnr,
+		timeout_ms = 3000,
+		filter = function(c)
+			return c.name == client_name
+		end,
+	})
+	if not ok then
+		return false, err
+	end
+	return true
+end
+
+---用项目本地 eslint --fix（写临时文件）格式化。
+---现代 eslint 已无 --fix-to-stdout；stdin+| --fix 也不可用。临时文件放在同目录以吃到正确 overrides。
+local function eslint_fix_buffer(bufnr)
+	local path = vim.api.nvim_buf_get_name(bufnr)
+	local root = format_root_for(path, format_config.eslint_markers)
+	if not root then
+		return false, "no eslint config"
+	end
+
+	local local_eslint = vim.fs.joinpath(root, "node_modules", ".bin", "eslint")
+	local cmd = nil
+	if vim.uv.fs_stat(local_eslint) then
+		cmd = local_eslint
+	elseif vim.fn.executable("eslint") == 1 then
+		cmd = "eslint"
+	else
+		return false, "project eslint not found (npm/pnpm install?)"
+	end
+
+	local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+	local ext = path:match("(%.[^./]+)$") or ".js"
+	local dir = vim.fs.dirname(path)
+	-- 不要用点开头文件名：ESLint 会默认 ignore（File ignored by default）
+	local tmp = vim.fs.joinpath(dir, "__nvim_eslint_fmt_" .. tostring(vim.fn.getpid()) .. ext)
+
+	local write_ok = pcall(function()
+		vim.fn.writefile(lines, tmp)
+	end)
+	if not write_ok then
+		return false, "cannot write temp file for eslint"
+	end
+
+	local result = vim.system({ cmd, "--fix", tmp }, {
+		cwd = root,
+		text = true,
+	}):wait()
+
+	local new_lines = nil
+	local read_ok, read_lines = pcall(vim.fn.readfile, tmp)
+	pcall(vim.fn.delete, tmp)
+
+	if read_ok then
+		new_lines = read_lines
+	end
+
+	-- exit 0/1 都可能已写入 fix；>1 为致命错误
+	if result.code > 1 then
+		local err = (result.stderr ~= "" and result.stderr) or ("eslint exit " .. tostring(result.code))
+		return false, err
+	end
+	if not new_lines then
+		return false, "eslint produced no output file"
+	end
+	if vim.deep_equal(lines, new_lines) then
+		return true
+	end
+	vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
+	return true
+end
+
+---解析本 buffer 保存时应如何 format；force=true 时忽略「无配置则跳过」但仍尊重 disable 开关
+---@return "skip"|"efm"|"jdtls"|"eslint" kind
+---@return string|nil reason
+local function resolve_format_kind(bufnr, force)
+	if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat then
+		return "skip", "autoformat disabled"
+	end
+	if vim.bo[bufnr].buftype ~= "" or not vim.bo[bufnr].modifiable then
+		return "skip", "special buffer"
+	end
+	local path = vim.api.nvim_buf_get_name(bufnr)
+	if path == "" then
+		return "skip", "unnamed"
+	end
+
+	local ft = vim.bo[bufnr].filetype
+
+	if ft == "java" then
+		return "jdtls"
+	end
+
+	if format_config.frontend_fts[ft] then
+		if format_root_for(path, format_config.prettier_markers) then
+			return "efm", "prettier"
+		end
+		if format_config.eslint_fix_fts[ft] and format_root_for(path, format_config.eslint_markers) then
+			return "eslint", "eslint-only project"
+		end
+		if force then
+			-- 手动 format：无配置时仍尝试 efm（可能 prettier 默认）
+			return "efm", "force"
+		end
+		return "skip", "no prettier/eslint project config"
+	end
+
+	local markers = format_config.markers_by_ft[ft]
+	if markers == true then
+		return "efm"
+	end
+	if type(markers) == "table" then
+		if format_root_for(path, markers) or force then
+			return "efm"
+		end
+		return "skip", "no project formatter config for " .. ft
+	end
+
+	-- 未列出的 filetype：不自动 format
+	if force then
+		return "efm"
+	end
+	return "skip", "filetype not configured for autoformat"
+end
+
+local function run_format(bufnr, opts)
+	opts = opts or {}
+	local kind, reason = resolve_format_kind(bufnr, opts.force)
+	if kind == "skip" then
+		if opts.notify then
+			vim.notify("format skip: " .. (reason or ""), vim.log.levels.INFO)
+		end
+		return false
+	end
+	if kind == "eslint" then
+		local ok, err = eslint_fix_buffer(bufnr)
+		if not ok and opts.notify then
+			vim.notify("eslint fix failed: " .. tostring(err), vim.log.levels.WARN)
+		end
+		return ok
+	end
+	if kind == "jdtls" then
+		local ok, err = lsp_format(bufnr, "jdtls")
+		if not ok and opts.notify then
+			vim.notify("jdtls format: " .. tostring(err), vim.log.levels.WARN)
+		end
+		return ok
+	end
+	-- efm
+	local ok, err = lsp_format(bufnr, "efm")
+	if not ok and opts.notify then
+		vim.notify("efm format: " .. tostring(err), vim.log.levels.WARN)
+	end
+	return ok
+end
+
+vim.keymap.set("n", "<leader>uf", function()
+	vim.g.disable_autoformat = not vim.g.disable_autoformat
+	vim.notify(
+		"format-on-save (global): " .. (vim.g.disable_autoformat and "OFF" or "ON"),
+		vim.log.levels.INFO
+	)
+end, { desc = "Toggle format-on-save (global)" })
+
+vim.keymap.set("n", "<leader>uF", function()
+	vim.b.disable_autoformat = not vim.b.disable_autoformat
+	vim.notify(
+		"format-on-save (buffer): " .. (vim.b.disable_autoformat and "OFF" or "ON"),
+		vim.log.levels.INFO
+	)
+end, { desc = "Toggle format-on-save (buffer)" })
+
+vim.keymap.set("n", "<leader>fm", function()
+	run_format(vim.api.nvim_get_current_buf(), { force = true, notify = true })
+end, { desc = "Format buffer (manual, best-effort)" })
+
+-- =============================================================================
 -- AUTOCMDS
 -- =============================================================================
 
 -- 所有用户 autocmd 放在同一个 augroup 中，便于管理和避免重复注册
 local augroup = vim.api.nvim_create_augroup("UserConfig", { clear = true })
 
--- 保存时自动格式化（Java 使用 jdtls，其它语言仅在 efm-langserver 已附加时执行）
+-- 保存时按项目配置选择 formatter（见上方 format 策略）
 vim.api.nvim_create_autocmd("BufWritePre", {
 	group = augroup,
 	pattern = {
@@ -321,7 +668,10 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 		"*.jsx",
 		"*.ts",
 		"*.tsx",
+		"*.vue",
+		"*.svelte",
 		"*.json",
+		"*.jsonc",
 		"*.css",
 		"*.scss",
 		"*.html",
@@ -333,41 +683,10 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 		"*.h",
 		"*.hpp",
 		"*.java",
+		"*.md",
 	},
 	callback = function(args)
-		-- 跳过特殊缓冲区（如 quickfix、terminal、prompt 等）
-		if vim.bo[args.buf].buftype ~= "" then
-			return
-		end
-		-- 跳过不可修改缓冲区
-		if not vim.bo[args.buf].modifiable then
-			return
-		end
-		-- 跳过未命名缓冲区
-		if vim.api.nvim_buf_get_name(args.buf) == "" then
-			return
-		end
-
-		local formatter = vim.bo[args.buf].filetype == "java" and "jdtls" or "efm"
-		local has_formatter = false
-		for _, c in ipairs(vim.lsp.get_clients({ bufnr = args.buf })) do
-			if c.name == formatter then
-				has_formatter = true
-				break
-			end
-		end
-		if not has_formatter then
-			return
-		end
-
-		-- 只使用指定 formatter，避免其他 LSP（如 ts_ls）抢占格式化权
-		pcall(vim.lsp.buf.format, {
-			bufnr = args.buf,
-			timeout_ms = 2000,
-			filter = function(c)
-				return c.name == formatter
-			end,
-		})
+		run_format(args.buf, { force = false, notify = false })
 	end,
 })
 
@@ -403,19 +722,38 @@ vim.api.nvim_create_autocmd("BufReadPost", {
 })
 
 -- Markdown/文本/Git commit 开启折行、整词折行和拼写检查
+-- spelllang 加 cjk：不把中日韩文字标成错词（默认 en 会把中文整段标红下划线）
 vim.api.nvim_create_autocmd("FileType", {
 	group = augroup,
 	pattern = { "markdown", "text", "gitcommit" },
 	callback = function()
 		vim.opt_local.wrap = true -- 开启折行
 		vim.opt_local.linebreak = true -- 在单词边界折行，而非字符中间
-		vim.opt_local.spell = true -- 开启拼写检查
+		vim.opt_local.spell = true
+		vim.opt_local.spelllang = { "en", "cjk" }
 	end,
 })
 
 -- =============================================================================
 -- 插件安装 (vim.pack — Neovim 0.12 内置包管理器)
 -- =============================================================================
+
+-- rest.nvim 的 luarocks 依赖（xml2lua / mimetypes）装在 ~/.luarocks；
+-- 必须在 vim.pack.add 加载 rest 的 plugin/ 检查之前加入 package.path。
+do
+	local home = vim.fn.expand("~")
+	local lr_share = home .. "/.luarocks/share/lua/5.1"
+	local lr_lib = home .. "/.luarocks/lib/lua/5.1"
+	package.path = table.concat({
+		lr_share .. "/?.lua",
+		lr_share .. "/?/init.lua",
+		package.path,
+	}, ";")
+	package.cpath = table.concat({
+		lr_lib .. "/?.so",
+		package.cpath,
+	}, ";")
+end
 
 vim.pack.add({
 	-- 工具集合（mini.ai/comment/surround 等，按需 setup）
@@ -436,6 +774,8 @@ vim.pack.add({
 	},
 	-- Markdown 内联渲染增强
 	"https://github.com/MeanderingProgrammer/render-markdown.nvim",
+	-- rest.nvim 进度提示（rockspec 依赖；vim.pack 不自动装 luarocks）
+	"https://github.com/j-hui/fidget.nvim",
 	-- HTTP 请求执行与响应查看
 	"https://github.com/rest-nvim/rest.nvim",
 	-- LSP 配置
@@ -499,8 +839,10 @@ wk.add({
 	{ "<leader>R", group = "rest" },
 	{ "<leader>s", group = "split" },
 	{ "<leader>t", desc = "Toggle floating terminal" },
+	{ "<leader>u", group = "toggle ui" },
 	{ "<leader>v", group = "debug" },
 	{ "<leader>x", desc = "Delete without yanking" },
+	{ "<leader>fm", desc = "Format buffer (manual)" },
 })
 
 -- ----------------------------------------------------------------------------
@@ -553,12 +895,8 @@ vim.keymap.set("n", "<leader>e", function()
 	require("nvim-tree.api").tree.toggle()
 end, { desc = "Toggle NvimTree" })
 
--- nvim-tree 透明背景
-vim.api.nvim_set_hl(0, "NvimTreeNormal", { bg = "none" })
-vim.api.nvim_set_hl(0, "NvimTreeNormalNC", { bg = "none" })
-vim.api.nvim_set_hl(0, "NvimTreeSignColumn", { bg = "none" })
-vim.api.nvim_set_hl(0, "NvimTreeEndOfBuffer", { bg = "none" })
-vim.api.nvim_set_hl(0, "NvimTreeWinSeparator", { fg = "#2a2a2a", bg = "none" })
+-- nvim-tree 高亮组在 setup 后可能被重置；再套一层透明（与顶部 apply_transparent_bg 一致）
+apply_transparent_bg()
 
 -- ----------------------------------------------------------------------------
 -- fzf-lua（模糊查找）
@@ -625,20 +963,18 @@ vim.keymap.set("n", "<leader>mr", function()
 end, { desc = "Toggle Markdown rendering" })
 
 -- ----------------------------------------------------------------------------
--- rest.nvim（HTTP 请求）
+-- rest.nvim（HTTP 请求；命令为 :Rest，非旧版 <Plug>RestNvim）
+-- 可选 Lua 依赖：fidget.nvim（vim.pack）、xml2lua/mimetypes（~/.luarocks）
 -- ----------------------------------------------------------------------------
 require("rest-nvim").setup({
-	result_split_horizontal = false,
-	skip_ssl_verification = false,
-	highlight = {
-		enabled = true,
-		timeout = 150,
+	request = {
+		skip_ssl_verification = false,
 	},
 })
 
-vim.keymap.set("n", "<leader>Rr", "<Plug>RestNvim", { desc = "Run HTTP request" })
-vim.keymap.set("n", "<leader>Rp", "<Plug>RestNvimPreview", { desc = "Preview HTTP request" })
-vim.keymap.set("n", "<leader>Rl", "<Plug>RestNvimLast", { desc = "Re-run last HTTP request" })
+vim.keymap.set("n", "<leader>Rr", "<cmd>Rest run<cr>", { desc = "Run HTTP request under cursor" })
+vim.keymap.set("n", "<leader>Ro", "<cmd>Rest open<cr>", { desc = "Open rest.nvim result pane" })
+vim.keymap.set("n", "<leader>Rl", "<cmd>Rest last<cr>", { desc = "Re-run last HTTP request" })
 
 -- ----------------------------------------------------------------------------
 -- gitsigns.nvim（Git 集成）
@@ -716,6 +1052,7 @@ local function setup_treesitter()
 		"go",
 		"c",
 		"cpp",
+		"http", -- rest.nvim 解析 .http 文件
 	}
 
 	-- 只安装尚未安装的 parser，避免重复触发编译

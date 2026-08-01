@@ -4,6 +4,8 @@
 
 界面里的很多图标来自 Nerd Font。终端字体如果不是 Nerd Font，statusline、诊断、Git 标记和补全菜单里的图标可能会显示成方块。
 
+配色为 `onedark`，并在加载后清除编辑区、sign 列、statusline、浮窗和 nvim-tree 等组的背景色，以便透出终端（或 compositor）背景。换 colorscheme 时会自动重新应用。
+
 ## 基础行为
 
 - 行号、相对行号、当前行高亮、100 列参考线默认开启。
@@ -12,7 +14,12 @@
 - 系统剪贴板使用 `unnamedplus`，需要系统提供 `xclip`、`xsel` 或 `wl-clipboard`。
 - 开启持久化撤销（`undofile`）；不创建 swap、backup、writebackup 文件。
 - Markdown、纯文本和 Git commit 会自动开启折行、整词折行和拼写检查。
-- 保存受支持文件时，如果当前 buffer 已附加 `efm`，会用 `efm` 自动格式化；Java 例外，保存时使用 `jdtls` 格式化。
+- 保存时格式化采用「有项目配置才自动 + 可开关」策略，避免前端无 Prettier、仅 ESLint 的仓库被全局 `prettierd` 改坏风格：
+  - **有 Prettier 配置**（`.prettierrc*` / `prettier.config.*`）→ `efm` + prettierd
+  - **仅有 ESLint 配置**（如公司 Vue 仓的 `.eslintrc.js` / `eslint.config.js`）→ 项目本地 `eslint --fix`（不跑 Prettier）
+  - **Lua / Python / Go / C/C++** → 分别需要 `stylua.toml`、`pyproject.toml` 等 marker，或 `go.mod` / `.clang-format`
+  - **Java** → 仍用 `jdtls`
+  - `<leader>uf` 全局开关、`<leader>uF` 当前 buffer 开关、`<leader>fm` 手动 format
 
 ## 插件总览
 
@@ -25,6 +32,7 @@
 | `gitsigns.nvim` | Git sign、hunk 导航、stage/reset/preview、blame 和 diff。 |
 | `nvim-treesitter` | 语法高亮和基于语法树的折叠。 |
 | `render-markdown.nvim` | 在 Neovim 内直接渲染 Markdown 标题、列表、表格、引用、代码块等元素。 |
+| `rest.nvim` | 在 `.http` 文件中发 HTTP 请求；依赖 `fidget.nvim`（vim.pack）以及本机 luarocks 的 `xml2lua` / `mimetypes`（`~/.luarocks`，Lua 5.1）。快捷键：`<leader>Rr` 运行、`<leader>Ro` 结果窗、`<leader>Rl` 重跑上次。 |
 | `mason.nvim` | 安装 LSP、linter、formatter 等外部工具；不负责配置 LSP。 |
 | `nvim-lspconfig` | 提供各语言 LSP 的默认配置来源。 |
 | `efmls-configs-nvim` | 给 `efm-langserver` 提供常用 linter/formatter 配置。 |

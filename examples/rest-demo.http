@@ -1,0 +1,44 @@
+# rest.nvim 演示文件
+# 用法（在 nvim 中打开本文件）：
+#   1. 把光标放在某个请求上（方法名那一行即可）
+#   2. <leader>Rr  或  :Rest run     — 运行光标处请求
+#   3. <leader>Ro  或  :Rest open    — 打开/聚焦结果窗
+#   4. <leader>Rl  或  :Rest last    — 重跑上一次
+# 多个请求之间用 ### 分隔。
+
+### Get a sample JSON todo
+# @name get_todo
+GET https://jsonplaceholder.typicode.com/todos/1
+Accept: application/json
+
+### GitHub zen quote (plain text)
+# @name github_zen
+GET https://api.github.com/zen
+User-Agent: rest.nvim-demo
+
+### Echo query params
+# @name echo_get
+GET https://postman-echo.com/get?from=nvim&tool=rest.nvim
+Accept: application/json
+
+### POST JSON body
+# @name create_post
+POST https://jsonplaceholder.typicode.com/posts
+Content-Type: application/json
+Accept: application/json
+
+{
+  "title": "rest.nvim demo",
+  "body": "Hello from Neovim",
+  "userId": 1
+}
+
+### POST form-style to echo service
+# @name echo_post
+POST https://postman-echo.com/post
+Content-Type: application/json
+
+{
+  "message": "if you see this in json, the request worked",
+  "editor": "nvim"
+}
