@@ -10,7 +10,7 @@
 - 搜索忽略大小写，但搜索词包含大写时自动区分大小写。
 - 分屏默认向下、向右打开。
 - 系统剪贴板使用 `unnamedplus`，需要系统提供 `xclip`、`xsel` 或 `wl-clipboard`。
-- 不创建 swap、backup、writebackup 文件。
+- 开启持久化撤销（`undofile`）；不创建 swap、backup、writebackup 文件。
 - Markdown、纯文本和 Git commit 会自动开启折行、整词折行和拼写检查。
 - 保存受支持文件时，如果当前 buffer 已附加 `efm`，会用 `efm` 自动格式化；Java 例外，保存时使用 `jdtls` 格式化。
 
@@ -120,7 +120,17 @@ Markdown 文件不会自动弹出补全菜单，避免写作时过度打扰；�
 | --- | --- |
 | `<leader>bn` | 下一个 buffer |
 | `<leader>bp` | 上一个 buffer |
+| `<leader>bd` | 关闭当前 buffer（`mini.bufremove`，尽量不拆窗口；有未保存修改时拒绝） |
 | `<leader>fb` | 用 fzf-lua 列出 buffers |
+
+### Window
+
+| 快捷键 | 作用 |
+| --- | --- |
+| `<C-h>` / `<C-j>` / `<C-k>` / `<C-l>` | 聚焦左/下/上/右窗口 |
+| `<leader>sv` | 垂直分屏 |
+| `<leader>sh` | 水平分屏 |
+| `<C-Up>` / `<C-Down>` / `<C-Left>` / `<C-Right>` | 调整窗口大小 |
 
 ### Find
 
@@ -240,4 +250,4 @@ Markdown 文件不会自动弹出补全菜单，避免写作时过度打扰；�
 | `j` / `k` | 无计数时按视觉行移动，有计数时按真实行移动 |
 | `J` | 合并行并保持光标位置 |
 | Visual `<` / `>` | 缩进后保持选区 |
-| `<A-j>` / `<A-k>` | 移动当前行或选区 |
+| `<A-j>` / `<A-k>` | 上下移动当前行或选区（不用 `mini.move`，避免与 Terminator 的 `A-l` 冲突） |

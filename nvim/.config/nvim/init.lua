@@ -55,8 +55,8 @@ vim.opt.splitright = true -- 垂直分屏新窗口在右侧
 vim.opt.clipboard = "unnamedplus" -- 使用系统剪贴板（需要 xclip/xsel/wl-clipboard）
 vim.opt.mouse = "a" -- 所有模式下启用鼠标支持
 
--- 持久化撤销（重启 Neovim 后仍可撤销）
-vim.opt.undofile = false
+-- 持久化撤销（重启 Neovim 后仍可撤销；默认写入 stdpath("state")/undo）
+vim.opt.undofile = true
 vim.opt.swapfile = false -- 不创建交换文件
 vim.opt.backup = false -- 不创建备份文件
 vim.opt.writebackup = false -- 写入时不创建临时备份
@@ -273,10 +273,17 @@ vim.keymap.set("v", "<A-k>", ":m '<-2<CR>gv=gv", { desc = "Move selection up" })
 -- 缓冲区切换
 vim.keymap.set("n", "<leader>bn", ":bnext<CR>", { desc = "Next buffer" })
 vim.keymap.set("n", "<leader>bp", ":bprevious<CR>", { desc = "Previous buffer" })
+-- mini.bufremove 在插件 setup 之后绑定 <leader>bd（见下方 mini 配置）
 
 -- 窗口分屏
 vim.keymap.set("n", "<leader>sv", ":vsplit<CR>", { desc = "Split window vertically" })
 vim.keymap.set("n", "<leader>sh", ":split<CR>", { desc = "Split window horizontally" })
+
+-- 窗口导航（与常见 Vim/tmux 习惯一致）
+vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "Focus window left" })
+vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "Focus window down" })
+vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "Focus window up" })
+vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "Focus window right" })
 
 -- 调整窗口大小
 vim.keymap.set("n", "<C-Up>", ":resize +2<CR>", { desc = "Increase window height" })
@@ -476,9 +483,10 @@ wk.add({
 		end,
 		desc = "Show buffer-local keymaps",
 	},
+	-- <leader>w / <leader>d 是立刻生效的具体键（保存 / 诊断浮窗），不注册为空 group，
+	-- 以免 which-key 提示与真实行为冲突；相关二级键靠各自 desc 展示。
 	{ "<leader>b", group = "buffer" },
 	{ "<leader>c", group = "code" },
-	{ "<leader>d", group = "diagnostics" },
 	{ "<leader>e", desc = "Toggle file explorer" },
 	{ "<leader>f", group = "find" },
 	{ "<leader>g", group = "goto" },
@@ -492,7 +500,6 @@ wk.add({
 	{ "<leader>s", group = "split" },
 	{ "<leader>t", desc = "Toggle floating terminal" },
 	{ "<leader>v", group = "debug" },
-	{ "<leader>w", group = "write/window" },
 	{ "<leader>x", desc = "Delete without yanking" },
 })
 
@@ -591,7 +598,7 @@ end, { desc = "FZF Diagnostics (workspace)" })
 -- ----------------------------------------------------------------------------
 require("mini.ai").setup({}) -- 增强文本对象（va(、di" 等）
 require("mini.comment").setup({}) -- gcc 注释当前行，gc + motion 注释区域
-require("mini.move").setup({}) -- Alt+hjkl 移动行/选区（与下方 A-j/k keymap 功能重叠，保留 mini.move 支持左右移动）
+-- 不用 mini.move：Terminator 占用 A-l（layout manager）；行上下移动用手写 A-j/A-k
 require("mini.surround").setup({}) -- sa/sd/sr 添加/删除/替换包裹符号
 require("mini.cursorword").setup({}) -- 自动高亮光标所在单词的所有出现
 require("mini.indentscope").setup({}) -- 动态缩进参考线（当前代码块）
@@ -600,6 +607,11 @@ require("mini.trailspace").setup({}) -- 高亮行尾多余空格
 require("mini.bufremove").setup({}) -- 关闭缓冲区而不关闭窗口（:bd 替代）
 require("mini.notify").setup({}) -- 浮窗通知替代 vim.notify
 require("mini.icons").setup({}) -- 图标支持（供 fzf-lua、nvim-tree 等使用）
+
+-- 关闭当前 buffer，尽量不拆窗口；有未保存修改时拒绝关闭（force=false）
+vim.keymap.set("n", "<leader>bd", function()
+	require("mini.bufremove").delete(0, false)
+end, { desc = "Delete buffer (keep window)" })
 
 -- ----------------------------------------------------------------------------
 -- render-markdown.nvim（Markdown 内联渲染）
