@@ -186,6 +186,9 @@ bar {
 # Screenshot
 bindsym Print exec --no-startup-id flameshot gui
 
+# Screen magnifier
+bindsym $mod+Shift+m exec --no-startup-id kmag
+
 # Screen locking
 # exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -c 111111
 
@@ -231,5 +234,9 @@ for_window [class="wechat"] move to workspace $ws6
 for_window [class="Awesun"] move to workspace $ws5
 for_window [class="VirtualBox Manager"] move to workspace $ws5
 for_window [class="trustcyberlink"] move to workspace $ws3
+
+# KMag is a lens: float it, keep it on every workspace, and leave keyboard focus alone.
+no_focus [class="^kmag$"]
+for_window [class="^kmag$"] floating enable, sticky enable, resize set 520 340, move position center
 
 exec_always --no-startup-id ~/.local/bin/start-showmethekey
