@@ -129,6 +129,13 @@ alias grep='grep --color=auto'
 # Machine-specific settings, such as proxy endpoints, live outside Git.
 [[ ! -f ~/.config/zsh/local.zsh ]] || source ~/.config/zsh/local.zsh
 
+# Node 24+ fetch/http ignore HTTP(S)_PROXY unless this is set (npx/GitHub).
+export NODE_USE_ENV_PROXY=1
+
+# Puppeteer's bundled Chrome has no AppArmor userns profile.
+# System Chrome does; impeccable URL detect needs this to launch a sandbox.
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+
 # auto env variables injection
 eval "$(direnv hook zsh)"
 
@@ -137,3 +144,22 @@ eval "$(mise activate zsh)"
 
 alias gitfourchette="QT_SCALE_FACTOR=1.25 $HOME/projects/opensource/gitfourchette/.venv/bin/gitfourchette"
 alias mysql8="docker exec -it mysql-8.4 mysql"
+
+# >>> Codex installer >>>
+export PATH="$HOME/.local/bin:$PATH"
+# <<< Codex installer <<<
+
+# TeX Live 2026
+if [ -d "$HOME/texlive/2026/bin/x86_64-linux" ]; then
+  case ":$PATH:" in
+    *":$HOME/texlive/2026/bin/x86_64-linux:"*) ;;
+    *) PATH="$HOME/texlive/2026/bin/x86_64-linux:$PATH" ;;
+  esac
+  export PATH
+fi
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+fpath=(~/.grok/completions/zsh $fpath)
+autoload -Uz compinit && compinit -C
+# <<< grok installer <<<
