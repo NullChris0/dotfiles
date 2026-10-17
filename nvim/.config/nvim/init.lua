@@ -885,10 +885,37 @@ vim.keymap.set({ "n", "v" }, "<leader>ve", dapui.eval, { desc = "Debug eval" })
 -- ----------------------------------------------------------------------------
 -- nvim-tree（文件树）
 -- ----------------------------------------------------------------------------
+local function on_attach(bufnr)
+  local api = require("nvim-tree.api")
+
+  -- Keep the default nvim-tree mappings.
+  api.map.on_attach.default(bufnr)
+
+  local function opts(desc)
+    return {
+      buffer = bufnr,
+      noremap = true,
+      silent = true,
+      nowait = true,
+      desc = "nvim-tree: " .. desc,
+    }
+  end
+
+  -- Recursively expand the folder under the cursor.
+  vim.keymap.set(
+    "n",
+    "<leader>ee",
+    api.node.expand,
+    opts("Expand Folder Recursively")
+  )
+end
+
 require("nvim-tree").setup({
 	view = { width = 35 },
 	filters = { dotfiles = false }, -- 显示隐藏文件（.env、.gitignore 等）
 	renderer = { group_empty = true }, -- 将连续的空目录合并显示（如 src/components/）
+	live_filter = { always_show_folders = false },
+	on_attach = on_attach,
 })
 
 vim.keymap.set("n", "<leader>e", function()
