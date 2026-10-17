@@ -219,7 +219,7 @@ bindsym XF86MonBrightnessUp exec --no-startup-id \
 
 # i3 desktop background
 exec_always feh --bg-fill ~/.local/share/dotfiles/wallpapers/bg-arc.png
-exec_always picom -f
+exec_always picom -b --config ~/.config/picom/picom.conf
 
 # Host-specific outputs and other local startup commands are not tracked.
 include ~/.config/i3/local.conf
