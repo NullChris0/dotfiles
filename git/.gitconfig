@@ -11,5 +11,22 @@
 	prune = true
 [diff]
 	algorithm = histogram
+	tool = meld
 [core]
 	editor = nvim
+[safe]
+	directory = *
+[merge]
+	tool = meld
+	conflictStyle = zdiff3
+[mergetool]
+	keepBackup = false
+	prompt = false
+[rerere]
+	enabled = true
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
