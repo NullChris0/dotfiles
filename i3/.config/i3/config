@@ -114,7 +114,7 @@ set $ws3 "3: VPN"
 set $ws4 "4:󱩖 AI"
 set $ws5 "5: Remotes"
 set $ws6 "6: WeChat"
-set $ws7 "7"
+set $ws7 "7: Files"
 set $ws8 "8"
 set $ws9 "9"
 set $ws10 "10"
@@ -234,6 +234,7 @@ for_window [class="wechat"] move to workspace $ws6
 for_window [class="Awesun"] move to workspace $ws5
 for_window [class="VirtualBox Manager"] move to workspace $ws5
 for_window [class="trustcyberlink"] move to workspace $ws3
+for_window [class="org.gnome.Nautilus"] move to workspace $ws7
 
 # KMag is a lens: float it, keep it on every workspace, and leave keyboard focus alone.
 no_focus [class="^kmag$"]
