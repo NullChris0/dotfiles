@@ -1,0 +1,5 @@
+# Paste literal text; Neovim can interpret injected keystrokes as editor actions.
+filter_class: "^kitty$"
+backend: clipboard
+# Kitty needs XTest events to receive the paste shortcut modifiers correctly.
+disable_x11_fast_inject: true
