@@ -9,7 +9,6 @@ Personal Linux configuration managed with Git and GNU Stow.
 | zsh | .zshrc, .zprofile, .p10k.zsh, local override example |
 | git | .gitconfig |
 | i3 | i3 and i3status configuration, local override example |
-| terminator | Terminator profile and layout |
 | kitty | Kitty terminal config |
 | mise | Tool versions |
 | assets | Desktop image assets |
@@ -85,7 +84,7 @@ then downloads the latest Linux release for the current architecture.
 ~~~bash
 cd "$HOME/dotfiles"
 stow --dir="$PWD" --target="$HOME" --no-folding --delete \
-  zsh git i3 terminator kitty mise assets nvim espanso
+  zsh git i3 kitty mise assets nvim espanso
 ~~~
 
 Local override files are regular untracked files and remain after unstowing.

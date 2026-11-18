@@ -2,9 +2,9 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-packages=(zsh git i3 terminator kitty mise assets nvim espanso)
+packages=(zsh git i3 kitty mise assets nvim espanso)
 required_commands=(git stow zsh)
-optional_commands=(i3 i3status rofi dex xss-lock i3lock nm-applet blueman-applet dunst pactl xrandr feh picom flameshot terminator kitty direnv mise fzf rg)
+optional_commands=(i3 i3status rofi dex xss-lock i3lock nm-applet blueman-applet dunst pactl xrandr feh picom flameshot kitty direnv mise fzf rg)
 
 missing_required=()
 for command_name in "${required_commands[@]}"; do

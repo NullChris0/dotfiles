@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-packages=(zsh git i3 terminator kitty mise assets nvim espanso)
+packages=(zsh git i3 kitty mise assets nvim espanso)
 temp_home=$(mktemp -d)
 trap 'rm -rf "$temp_home"' EXIT
 
@@ -34,7 +34,7 @@ printf 'Testing a clean Stow installation...\n'
 stow --dir="$repo_root" --target="$temp_home" --no-folding "${packages[@]}"
 test -L "$temp_home/.zshrc"
 test -L "$temp_home/.config/i3/config"
-test -L "$temp_home/.config/terminator/config"
+test -L "$temp_home/.config/kitty/kitty.conf"
 test -L "$temp_home/.config/mise/config.toml"
 test -L "$temp_home/.local/share/dotfiles/wallpapers/bg-arc.png"
 test -L "$temp_home/.config/nvim/init.lua"
