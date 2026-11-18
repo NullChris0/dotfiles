@@ -70,12 +70,21 @@ git commit
 git push
 ~~~
 
+Update Magpie without relying on its built-in proxy detection:
+
+~~~bash
+./scripts/update_magpie.sh
+~~~
+
+The script reads Magpie's configured proxy, or `MAGPIE_UPDATE_PROXY` when set,
+then downloads the latest Linux release for the current architecture.
+
 ## Remove Links
 
 ~~~bash
 cd "$HOME/dotfiles"
 stow --dir="$PWD" --target="$HOME" --no-folding --delete \
-  zsh git i3 terminator mise assets nvim
+  zsh git i3 terminator mise assets nvim espanso
 ~~~
 
 Local override files are regular untracked files and remain after unstowing.
