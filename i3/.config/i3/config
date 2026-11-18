@@ -21,6 +21,7 @@ font pango:FiraCode Nerd Font Propo Regular 14
 
 # Start XDG autostart .desktop files using dex. See also
 # https://wiki.archlinux.org/index.php/XDG_Autostart
+exec --no-startup-id /usr/local/bin/snixembed
 exec --no-startup-id dex --autostart --environment i3
 
 # The combination of xss-lock, nm-applet and pactl is a popular choice, so
@@ -241,3 +242,8 @@ no_focus [class="^kmag$"]
 for_window [class="^kmag$"] floating enable, sticky enable, resize set 520 340, move position center
 
 exec_always --no-startup-id ~/.local/bin/start-showmethekey
+
+# Win+V-style clipboard panel
+exec --no-startup-id copyq
+bindsym $mod+Shift+v exec --no-startup-id copyq toggle
+for_window [class="^copyq$"] floating enable, move position mouse
