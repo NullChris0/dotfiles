@@ -157,9 +157,3 @@ if [ -d "$HOME/texlive/2026/bin/x86_64-linux" ]; then
   esac
   export PATH
 fi
-
-# >>> grok installer >>>
-export PATH="$HOME/.grok/bin:$PATH"
-fpath=(~/.grok/completions/zsh $fpath)
-autoload -Uz compinit && compinit -C
-# <<< grok installer <<<
