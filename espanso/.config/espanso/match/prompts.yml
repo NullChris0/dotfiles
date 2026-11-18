@@ -1,0 +1,20 @@
+matches:
+  - trigger: ":review"
+    form: |
+      Review this [[lang]] code. Focus on [[focus]]. Be terse.
+
+      [[code]]
+    form_fields:
+      lang:
+        default: Python
+      focus:
+        type: choice
+        values: [bugs, security, performance, readability]
+      code:
+        multiline: true
+
+  - trigger: ":clip"
+    replace: "Summarize this:\n\n{{clipboard}}"
+    vars:
+      - name: clipboard
+        type: clipboard
