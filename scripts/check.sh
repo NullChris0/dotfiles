@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-packages=(zsh git i3 terminator mise assets nvim espanso)
+packages=(zsh git i3 terminator kitty mise assets nvim espanso)
 temp_home=$(mktemp -d)
 trap 'rm -rf "$temp_home"' EXIT
 

@@ -1,6 +1,7 @@
 # Host-specific overrides
 zsh/.config/zsh/local.zsh
 i3/.config/i3/local.conf
+kitty/.config/kitty/local.conf
 
 # Editor and operating-system state
 *~

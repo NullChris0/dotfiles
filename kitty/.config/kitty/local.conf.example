@@ -1,0 +1,3 @@
+# Copy to ~/.config/kitty/local.conf for host-specific settings.
+# background_image /home/USER/Pictures/wallpaper.png
+# background_image_layout cscaled
