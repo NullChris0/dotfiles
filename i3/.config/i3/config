@@ -195,7 +195,7 @@ bindsym $mod+Shift+m exec --no-startup-id kmag
 
 # Network, Bluetooth and notifications
 exec --no-startup-id nm-applet
-exec --no-startup-id blueman-applet
+exec --no-startup-id /home/nc/.local/bin/start-blueman-applet
 exec --no-startup-id dunst
 
 # Authentication agent
